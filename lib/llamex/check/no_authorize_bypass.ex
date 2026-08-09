@@ -10,7 +10,7 @@ defmodule Llamex.Check.NoAuthorizeBypass do
     explanations: [
       check: """
       Ash actions must receive the actor that started the call. System-initiated
-      actions (Oban jobs, seeds, migrations) must pass `authorize?: {system: :name}`
+      actions (Oban jobs, seeds, migrations) must pass `authorize?: %{system: :name}`
       or a system actor instead of `authorize?: false`.
 
       This check flags any call that passes `authorize?: false` as a keyword
@@ -19,7 +19,7 @@ defmodule Llamex.Check.NoAuthorizeBypass do
       call, or a domain interface call on a dotted module.
 
       Remove `authorize?: false` and pass the real actor. For system-initiated
-      actions, pass `actor: {system: :job_name}` or a similar system marker.
+      actions, pass `actor: %{system: :job_name}` or a similar system marker.
       """,
       params: [
         skip_tests:
