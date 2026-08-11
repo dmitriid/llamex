@@ -4,6 +4,10 @@ A suite of Credo plugins that catch and fix issues introduced by various LLMs.
 
 Each issue available in its own module, so that users can mix and match whatever part of code cleanup they want.
 
+## Project Status
+
+This project is vibe-coded. An AI coding agent wrote most of the code with little user input. We tested the checks on real Elixir projects, but this does not guarantee correct results in every project. Review each finding before you change code. Your results can vary (YMMV).
+
 ## Llamex.NoOneLiners
 
 Catches stupid useless redundant one-liners left after LLM refactorings.

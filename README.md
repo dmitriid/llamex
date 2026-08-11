@@ -12,6 +12,13 @@ refactors commonly introduce. The suite ships five checks:
 The checks detect problems and show useful messages. They do not apply
 automatic fixes.
 
+## Project Status
+
+This project is vibe-coded. An AI coding agent wrote most of the code with
+little user input. We tested the checks on real Elixir projects, but this does
+not guarantee correct results in every project. Review each finding before you
+change code. Your results can vary (YMMV).
+
 ## Installation
 
 Add `llamex` to your dependencies:

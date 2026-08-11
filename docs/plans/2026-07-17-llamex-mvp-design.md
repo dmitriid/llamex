@@ -11,6 +11,10 @@ Llamex is a Credo plugin suite that catches issues commonly introduced by LLM-as
 
 The first release prioritizes detection, useful messages, and conservative behavior around uncertainty. It does not include automatic fixes.
 
+## Project Status
+
+This project is vibe-coded. An AI coding agent wrote most of the code with little user input. We tested the checks on real Elixir projects, but this does not guarantee correct results in every project. Users must review each finding before they change code. Results can vary (YMMV).
+
 Source brief: [project-description.md](../../project-description.md).
 
 ## User-Facing Configuration
