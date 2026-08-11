@@ -82,6 +82,17 @@ This check flags redundant wrapper functions. It detects three patterns:
 2. The body assigns a delegated value and returns it.
 3. The body ignores a helper result and returns a synthetic success tuple.
 
+Flagged examples:
+
+```elixir
+def search_for_record(id), do: Search.search_for_record(id)
+
+def get_record(id) do
+  value = Search.get_one_record!(id)
+  {:ok, value}
+end
+```
+
 The check skips these cases:
 
 - Guarded or pattern-narrowing heads
@@ -114,6 +125,16 @@ inline query options: `load`, `filter`, `sort`, or `query`.
 Pagination options (`page`, `limit`, `offset`) are allowed. Paging at call
 time is the Ash-designed API.
 
+Flagged examples:
+
+```elixir
+Ticket
+|> Ash.Changeset.for_create(:open, params)
+|> Ash.create!()
+
+Support.get_user_records!(id, load: [:comments])
+```
+
 The check allows aggregate calls like `Ash.count!/1`. It also allows Ash
 implementation modules that `use Ash.Resource.*` or similar extension points.
 
@@ -130,6 +151,14 @@ Default severity: warning.
 This check flags Ash domain `define` declarations where the interface name
 differs from the referenced action name.
 
+Flagged example:
+
+```elixir
+define :suggest_card_size_matches,
+  action: :list_and_suggest_matched_cards,
+  args: [:input]
+```
+
 Default message:
 
 ```text
@@ -143,6 +172,14 @@ Default severity: error-level priority for proven local origins.
 This check flags `Enum`, `List`, and `Stream` collection work when the
 collection traces back to an Ash domain interface or direct Ash read. The
 trace stays within the current file. Findings include the traced origin path.
+
+Flagged example:
+
+```elixir
+Books.get_all_books!()
+|> Enum.reject(&is_nil/1)
+|> Enum.filter(&(&1.status == :invalid))
+```
 
 To opt out when whole-dataset in-memory work is intentional, add this
 module attribute:
@@ -165,6 +202,13 @@ Default severity: warning.
 
 This check flags `authorize?: false` in Ash action calls, domain interface
 calls, and `Ash.Query`/`Ash.Changeset` calls.
+
+Flagged examples:
+
+```elixir
+Ash.create!(changeset, authorize?: false)
+Support.get_ticket!(id, authorize?: false)
+```
 
 Actions must receive the actor that started the call. System-initiated
 actions (Oban jobs, seeds, migrations) must pass a system actor instead:
