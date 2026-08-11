@@ -10,7 +10,7 @@ defmodule Llamex.Check.NoAuthorizeBypass do
     explanations: [
       check: """
       Ash actions must receive the actor that started the call. System-initiated
-      actions (Oban jobs, seeds, migrations) must pass `authorize?: %{system: :name}`
+      actions (Oban jobs, seeds, migrations) must pass `actor: %{system: :name}`
       or a system actor instead of `authorize?: false`.
 
       This check flags any call that passes `authorize?: false` as a keyword
@@ -30,7 +30,7 @@ defmodule Llamex.Check.NoAuthorizeBypass do
   alias Credo.IssueMeta
   alias Llamex.Analysis.{Ash, AST, Source}
 
-  @message "Do not use authorize?: false. Pass the actor that started the call, or actor: {system, :name} for system-initiated actions"
+  @message "Do not use authorize?: false. Pass the actor that started the call, or actor: %{system: name} for system-initiated actions"
 
   @impl true
   def run(source_file, params \\ []) do

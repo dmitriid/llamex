@@ -564,6 +564,8 @@ defmodule Llamex.ChecksTest do
 
       assert [issue] = issues(Llamex.Check.NoAuthorizeBypass, source)
       assert issue.message =~ "Do not use authorize?: false"
+      assert issue.message =~ "actor: %{system: name}"
+      refute issue.message =~ "{system,"
     end
 
     test "flags authorize?: false on Ash.Changeset calls" do

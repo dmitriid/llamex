@@ -221,14 +221,14 @@ Support.create_ticket!(params, authorize?: false)
 Support.create_ticket!(params, actor: user)
 
 # For system-initiated actions:
-Support.create_ticket!(params, actor: {system, :my_oban_job})
+Support.create_ticket!(params, actor: %{system: :my_oban_job})
 ```
 
 Default message:
 
 ```text
 Do not use authorize?: false. Pass the actor that started the call, or
-actor: {system, :name} for system-initiated actions
+actor: %{system: name} for system-initiated actions
 ```
 
 ## Confidence Model
