@@ -19,6 +19,9 @@ little user input. We tested the checks on real Elixir projects, but this does
 not guarantee correct results in every project. Review each finding before you
 change code. Your results can vary (YMMV).
 
+For a detailed description of the checks and their initial goals, see the
+[project description](project-description.md).
+
 ## Installation
 
 Add `llamex` to your dependencies:
