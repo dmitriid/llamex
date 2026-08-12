@@ -696,8 +696,9 @@ defmodule Llamex.ChecksTest do
       """
 
       assert [issue] = issues(Llamex.Check.NoSelfInLiveViews, source)
-      assert issue.message =~ "Do not use self() in Phoenix LiveViews"
-      assert issue.message =~ "Use LiveView's async assigns"
+
+      assert issue.message ==
+               "Do not use self() in Phoenix LiveViews. Use start_async/3 or assign_async/3, and handle the result with built-in Phoenix functions. Use Task or supervisor trees only in rare cases."
     end
 
     test "flags self calls in project macro LiveView modules" do

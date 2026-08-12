@@ -264,7 +264,9 @@ end
 Default message:
 
 ```text
-Do not use self() in Phoenix LiveViews. Use LiveView's async assigns, and in rare cases external Tasks and supervisor trees.
+Do not use self() in Phoenix LiveViews. Use start_async/3 or assign_async/3,
+and handle the result with built-in Phoenix functions. Use Task or supervisor
+trees only in rare cases.
 ```
 
 ## Confidence Model

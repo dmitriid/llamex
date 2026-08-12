@@ -14,8 +14,8 @@ defmodule Llamex.Check.NoSelfInLiveViews do
       process from code that can use `assign_async/3`, `start_async/3`, or a
       supervised task.
 
-      Use LiveView async assigns. For rare cases, use external Tasks and
-      supervisor trees.
+      Use `start_async/3` or `assign_async/3`. Handle the result with built-in
+      Phoenix functions. Use `Task` or supervisor trees only in rare cases.
       """,
       params: [
         skip_tests:
@@ -26,7 +26,7 @@ defmodule Llamex.Check.NoSelfInLiveViews do
   alias Credo.IssueMeta
   alias Llamex.Analysis.{AST, Source}
 
-  @message "Do not use self() in Phoenix LiveViews. Use LiveView's async assigns, and in rare cases external Tasks and supervisor trees."
+  @message "Do not use self() in Phoenix LiveViews. Use start_async/3 or assign_async/3, and handle the result with built-in Phoenix functions. Use Task or supervisor trees only in rare cases."
 
   @impl true
   def run(source_file, params \\ []) do
