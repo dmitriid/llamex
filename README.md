@@ -1,13 +1,14 @@
 # Llamex
 
 Llamex is a Credo plugin suite. It detects issues that LLM-assisted Elixir
-refactors commonly introduce. The suite ships five checks:
+refactors commonly introduce. The suite ships six checks:
 
 - `Llamex.Check.NoOneLiners`
 - `Llamex.Check.NoAdHocAshQueries`
 - `Llamex.Check.ConsistentInterfaces`
 - `Llamex.Check.NoDBWorkInMemory`
 - `Llamex.Check.NoAuthorizeBypass`
+- `Llamex.Check.NoSelfInLiveViews`
 
 The checks detect problems and show useful messages. They do not apply
 automatic fixes.
@@ -239,6 +240,31 @@ Default message:
 ```text
 Do not use authorize?: false. Pass the actor that started the call, or
 actor: %{system: name} for system-initiated actions
+```
+
+### NoSelfInLiveViews
+
+Default severity: warning.
+
+This check reports local `self()` calls inside Phoenix LiveView modules. It
+detects modules that use `Phoenix.LiveView` and modules that use the common
+project macro form, such as `use MyAppWeb, :live_view`.
+
+The check starts at each `self()` call and checks its parent module.
+
+Flagged example:
+
+```elixir
+def mount(_params, _session, socket) do
+  send(self(), :load)
+  {:ok, socket}
+end
+```
+
+Default message:
+
+```text
+Do not use self() in Phoenix LiveViews. Use LiveView's async assigns, and in rare cases external Tasks and supervisor trees.
 ```
 
 ## Confidence Model

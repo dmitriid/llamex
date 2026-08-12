@@ -10,7 +10,8 @@ defmodule Llamex.ChecksTest do
              Llamex.Check.NoAdHocAshQueries,
              Llamex.Check.ConsistentInterfaces,
              Llamex.Check.NoDBWorkInMemory,
-             Llamex.Check.NoAuthorizeBypass
+             Llamex.Check.NoAuthorizeBypass,
+             Llamex.Check.NoSelfInLiveViews
            ]
   end
 
@@ -40,6 +41,7 @@ defmodule Llamex.ChecksTest do
     assert {Llamex.Check.ConsistentInterfaces, [skip_tests: true]} in exec.checks.enabled
     assert {Llamex.Check.NoDBWorkInMemory, [skip_tests: true]} in exec.checks.enabled
     assert {Llamex.Check.NoAuthorizeBypass, [skip_tests: true]} in exec.checks.enabled
+    assert {Llamex.Check.NoSelfInLiveViews, [skip_tests: true]} in exec.checks.enabled
   end
 
   test "plugin-level skip_tests config is propagated to injected checks" do
@@ -123,6 +125,17 @@ defmodule Llamex.ChecksTest do
        defmodule SampleTest do
          def helper(id) do
            Support.get_ticket!(id, authorize?: false)
+         end
+       end
+       """},
+      {Llamex.Check.NoSelfInLiveViews,
+       """
+       defmodule SampleTest do
+         use SampleWeb, :live_view
+
+         def mount(_params, _session, socket) do
+           send(self(), :load)
+           {:ok, socket}
          end
        end
        """}
@@ -666,6 +679,67 @@ defmodule Llamex.ChecksTest do
 
       assert [issue] = issues(Llamex.Check.NoAuthorizeBypass, source)
       assert issue.message =~ "Do not use authorize?: false"
+    end
+  end
+
+  describe "NoSelfInLiveViews" do
+    test "flags self calls in Phoenix LiveView modules" do
+      source = """
+      defmodule SampleWeb.HomeLive do
+        use Phoenix.LiveView
+
+        def mount(_params, _session, socket) do
+          send(self(), :load)
+          {:ok, socket}
+        end
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoSelfInLiveViews, source)
+      assert issue.message =~ "Do not use self() in Phoenix LiveViews"
+      assert issue.message =~ "Use LiveView's async assigns"
+    end
+
+    test "flags self calls in project macro LiveView modules" do
+      source = """
+      defmodule SampleWeb.HomeLive do
+        use SampleWeb, :live_view
+
+        def handle_event("refresh", _params, socket) do
+          Process.send_after(self(), :refresh, 100)
+          {:noreply, socket}
+        end
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoSelfInLiveViews, source)
+      assert issue.trigger == "self"
+    end
+
+    test "allows self calls outside LiveView modules" do
+      source = """
+      defmodule Sample.Worker do
+        def run do
+          send(self(), :load)
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoSelfInLiveViews, source)
+    end
+
+    test "allows LiveView modules without self calls" do
+      source = """
+      defmodule SampleWeb.HomeLive do
+        use SampleWeb, :live_view
+
+        def mount(_params, _session, socket) do
+          {:ok, assign_async(socket, :stats, fn -> {:ok, %{stats: 1}} end)}
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoSelfInLiveViews, source)
     end
   end
 end

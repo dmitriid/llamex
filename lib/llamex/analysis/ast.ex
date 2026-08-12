@@ -25,10 +25,46 @@ defmodule Llamex.Analysis.AST do
     Enum.reverse(acc)
   end
 
+  def walk_with_ancestors(ast, fun) when is_function(fun, 2) do
+    {_ast, {_ancestors, acc}} =
+      Macro.traverse(
+        ast,
+        {[], []},
+        fn node, {ancestors, acc} ->
+          acc =
+            case fun.(node, ancestors) do
+              nil -> acc
+              value -> [value | acc]
+            end
+
+          {node, {[node | ancestors], acc}}
+        end,
+        fn node, {[_current | ancestors], acc} ->
+          {node, {ancestors, acc}}
+        end
+      )
+
+    Enum.reverse(acc)
+  end
+
   def module_uses(ast) do
+    ast
+    |> module_use_calls()
+    |> Enum.map(& &1.module_name)
+  end
+
+  def module_use_calls(ast) do
     walk(ast, fn
-      {:use, _meta, [module | _]} -> alias_to_string(module)
-      _ -> nil
+      {:use, meta, [module | args]} ->
+        %{
+          module: alias_to_atom(module),
+          module_name: alias_to_string(module),
+          args: args,
+          line: meta[:line]
+        }
+
+      _ ->
+        nil
     end)
   end
 
