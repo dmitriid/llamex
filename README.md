@@ -25,15 +25,25 @@ For a detailed description of the checks and their initial goals, see the
 
 ## Installation
 
-Add `llamex` to your dependencies:
+Llamex is not a published Hex package. Clone the repository next to your
+Elixir project:
+
+```sh
+git clone https://github.com/dmitriid/llamex.git
+```
+
+Then, add Llamex to your project as a local dependency. This example expects
+the Llamex and project directories to have the same parent directory:
 
 ```elixir
 def deps do
   [
-    {:llamex, "~> 0.1.0", only: [:dev, :test], runtime: false}
+    {:llamex, path: "../llamex", only: [:dev, :test], runtime: false}
   ]
 end
 ```
+
+Run `mix deps.get` in your project after you add the dependency.
 
 To enable the full suite as a Credo plugin, add `Llamex` to `.credo.exs`:
 
