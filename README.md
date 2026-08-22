@@ -1,7 +1,7 @@
 # Llamex
 
 Llamex is a Credo plugin suite. It detects issues that LLM-assisted Elixir
-refactors commonly introduce. The suite ships six checks:
+refactors commonly introduce. The suite ships seven checks:
 
 - `Llamex.Check.NoOneLiners`
 - `Llamex.Check.NoAdHocAshQueries`
@@ -9,6 +9,7 @@ refactors commonly introduce. The suite ships six checks:
 - `Llamex.Check.NoDBWorkInMemory`
 - `Llamex.Check.NoAuthorizeBypass`
 - `Llamex.Check.NoSelfInLiveViews`
+- `Llamex.Check.NoMultipleAssigns`
 
 The checks detect problems and show useful messages. They do not apply
 automatic fixes.
@@ -277,6 +278,43 @@ Default message:
 Do not use self() in Phoenix LiveViews. Use start_async/3 or assign_async/3,
 and handle the result with built-in Phoenix functions. Use Task or supervisor
 trees only in rare cases.
+```
+
+### NoMultipleAssigns
+
+Default severity: readability warning. This check does not change the exit
+status of `mix credo`. The build does not fail on its findings.
+
+This check reports pipe chains with more than three single-key `assign`
+calls. One `assign` call with a keyword list shows all keys in one place.
+
+Flagged example:
+
+```elixir
+socket
+|> assign(:tab, parse_tab(params["tab"]))
+|> assign(:status, parse_status(params["status"]))
+|> assign(:page, parse_page(params["page"]))
+|> assign(:url_status, parse_status(params["url_status"]))
+```
+
+Preferred form:
+
+```elixir
+assign(socket,
+  tab: parse_tab(params["tab"]),
+  status: parse_status(params["status"]),
+  page: parse_page(params["page"]),
+  url_status: parse_status(params["url_status"])
+)
+```
+
+The `max_assigns` param sets the threshold. The default value is 3.
+
+Default message:
+
+```text
+For readability, avoid multiple assign statements. Use socket |> assign(key1: ..., key2: ...)
 ```
 
 ## Confidence Model

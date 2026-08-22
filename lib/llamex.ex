@@ -11,7 +11,8 @@ defmodule Llamex do
     Llamex.Check.ConsistentInterfaces,
     Llamex.Check.NoDBWorkInMemory,
     Llamex.Check.NoAuthorizeBypass,
-    Llamex.Check.NoSelfInLiveViews
+    Llamex.Check.NoSelfInLiveViews,
+    Llamex.Check.NoMultipleAssigns
   ]
 
   @doc "Returns all checks shipped by Llamex."

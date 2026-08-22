@@ -11,7 +11,8 @@ defmodule Llamex.ChecksTest do
              Llamex.Check.ConsistentInterfaces,
              Llamex.Check.NoDBWorkInMemory,
              Llamex.Check.NoAuthorizeBypass,
-             Llamex.Check.NoSelfInLiveViews
+             Llamex.Check.NoSelfInLiveViews,
+             Llamex.Check.NoMultipleAssigns
            ]
   end
 
@@ -42,6 +43,7 @@ defmodule Llamex.ChecksTest do
     assert {Llamex.Check.NoDBWorkInMemory, [skip_tests: true]} in exec.checks.enabled
     assert {Llamex.Check.NoAuthorizeBypass, [skip_tests: true]} in exec.checks.enabled
     assert {Llamex.Check.NoSelfInLiveViews, [skip_tests: true]} in exec.checks.enabled
+    assert {Llamex.Check.NoMultipleAssigns, [skip_tests: true]} in exec.checks.enabled
   end
 
   test "plugin-level skip_tests config is propagated to injected checks" do
@@ -136,6 +138,18 @@ defmodule Llamex.ChecksTest do
          def mount(_params, _session, socket) do
            send(self(), :load)
            {:ok, socket}
+         end
+       end
+       """},
+      {Llamex.Check.NoMultipleAssigns,
+       """
+       defmodule SampleTest do
+         def helper(socket) do
+           socket
+           |> assign(:a, 1)
+           |> assign(:b, 2)
+           |> assign(:c, 3)
+           |> assign(:d, 4)
          end
        end
        """}
@@ -741,6 +755,110 @@ defmodule Llamex.ChecksTest do
       """
 
       assert [] = issues(Llamex.Check.NoSelfInLiveViews, source)
+    end
+  end
+
+  describe "NoMultipleAssigns" do
+    test "flags pipe chains with more than three single-key assign calls" do
+      source = """
+      defmodule SampleWeb.DownloadsLive do
+        def apply_params(socket, params) do
+          socket
+          |> assign(:tab, parse_tab(params["tab"]))
+          |> assign(:torrent_status, parse_torrent_status(params["status"]))
+          |> assign(:torrent_page, DriveComponents.parse_page(params["page"]))
+          |> assign(:url_status, parse_download_status(params["url_status"]))
+        end
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoMultipleAssigns, source)
+
+      assert issue.message ==
+               "For readability, avoid multiple assign statements. Use socket |> assign(key1: ..., key2: ...)"
+
+      assert issue.trigger == "assign"
+      assert issue.exit_status == 0
+    end
+
+    test "counts a full assign call at the chain head" do
+      source = """
+      defmodule SampleWeb.DownloadsLive do
+        def apply_params(socket, params) do
+          assign(socket, :tab, params["tab"])
+          |> assign(:status, params["status"])
+          |> assign(:page, params["page"])
+          |> assign(:url_status, params["url_status"])
+        end
+      end
+      """
+
+      assert [_issue] = issues(Llamex.Check.NoMultipleAssigns, source)
+    end
+
+    test "allows chains with three or fewer assign calls" do
+      source = """
+      defmodule SampleWeb.DownloadsLive do
+        def apply_params(socket, params) do
+          socket
+          |> assign(:tab, params["tab"])
+          |> assign(:status, params["status"])
+          |> assign(:page, params["page"])
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoMultipleAssigns, source)
+    end
+
+    test "allows one assign call with a keyword list or a map" do
+      source = """
+      defmodule SampleWeb.DownloadsLive do
+        def apply_params(socket, params) do
+          socket
+          |> assign(tab: params["tab"], status: params["status"])
+          |> assign(%{page: params["page"], url_status: params["url_status"]})
+          |> then(&maybe_track(&1))
+          |> assign(:note_status, params["note_status"])
+          |> assign(:note_page, params["note_page"])
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoMultipleAssigns, source)
+    end
+
+    test "does not count assign calls across separate pipe chains" do
+      source = """
+      defmodule SampleWeb.DownloadsLive do
+        def apply_params(socket, params) do
+          socket =
+            socket
+            |> assign(:tab, params["tab"])
+            |> assign(:status, params["status"])
+
+          socket
+          |> assign(:page, params["page"])
+          |> assign(:url_status, params["url_status"])
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoMultipleAssigns, source)
+    end
+
+    test "honors the max_assigns param" do
+      source = """
+      defmodule SampleWeb.DownloadsLive do
+        def apply_params(socket, params) do
+          socket
+          |> assign(:tab, params["tab"])
+          |> assign(:status, params["status"])
+        end
+      end
+      """
+
+      assert [_issue] = issues(Llamex.Check.NoMultipleAssigns, source, max_assigns: 1)
     end
   end
 end
