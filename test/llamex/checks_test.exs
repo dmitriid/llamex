@@ -532,6 +532,22 @@ defmodule Llamex.ChecksTest do
       assert issue.message =~ "Books.get_all_books!"
     end
 
+    test "ignores Enum work on values from Erlang module calls" do
+      source = """
+      defmodule Sample do
+        def token do
+          bytes = :crypto.strong_rand_bytes(16)
+
+          bytes
+          |> :binary.bin_to_list()
+          |> Enum.map(&Integer.to_string(&1, 16))
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoDBWorkInMemory, source)
+    end
+
     test "honors the Llamex opt-out attribute" do
       source = """
       defmodule Sample do

@@ -219,9 +219,20 @@ defmodule Llamex.Analysis.AST do
   def call_to_string(expression), do: Macro.to_string(expression)
 
   def resolve_alias(module, aliases) when is_atom(module) do
-    parts = Module.split(module)
+    if elixir_module?(module) do
+      resolve_elixir_alias(module, aliases)
+    else
+      module
+    end
+  end
 
-    case parts do
+  def resolve_alias(module, _aliases), do: module
+
+  # Module.split/1 raises for Erlang module atoms such as :crypto.
+  defp elixir_module?(module), do: String.starts_with?(Atom.to_string(module), "Elixir.")
+
+  defp resolve_elixir_alias(module, aliases) do
+    case Module.split(module) do
       [single] ->
         Map.get(aliases, String.to_atom(single), module)
 
@@ -232,8 +243,6 @@ defmodule Llamex.Analysis.AST do
         end
     end
   end
-
-  def resolve_alias(module, _aliases), do: module
 
   defp function_tuple(kind, meta, head, body) do
     %{
