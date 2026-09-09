@@ -345,9 +345,11 @@ The plugin does not enable this check by default. See the installation
 section for the `llmisms_in_comments` plugin option. You can also add the
 check module to `checks.extra` directly.
 
-This check scans each `#` comment block for phrases that language models
-write and people do not. A block is a run of comments on consecutive
-lines. The check reports a block when the count of matches is above the
+This check scans each `#` comment block and each doc string for phrases
+that language models write and people do not. A comment block is a run
+of comments on consecutive lines. A doc string is the value of
+`@moduledoc`, `@doc`, `@typedoc`, or `@shortdoc`. Each doc string is one
+block. The check reports a block when the count of matches is above the
 limit for the block size.
 
 The limit is a ratio: `max_llmisms` matches per `window_lines` lines. The
@@ -406,7 +408,11 @@ The check scans for these pattern classes:
   `make sure to`
 
 The check ignores inline code in backticks, URLs, and Credo directive
-comments. It does not scan `@moduledoc` and `@doc` strings.
+comments. In doc strings, it also ignores blank lines, fenced code
+blocks, and lines with an indent of 4 spaces or more. The indent rule
+skips doctests and Markdown code blocks. The check does not scan
+`@moduledoc false` or doc attributes with only options, for example
+`@doc since: "1.0"`.
 
 Flagged example:
 
@@ -422,14 +428,15 @@ Preferred form:
 def helper, do: :ok
 ```
 
-Default message:
+Default messages:
 
 ```text
 Too many LLMisms and non-human text in comments: 3 found in 1 line, limit 2 per 10 lines (contraction, filler phrase, comment narration)
+Too many LLMisms and non-human text in docs: 3 found in 2 lines, limit 2 per 10 lines (word with no fact)
 ```
 
 The extended explanation from `mix credo explain` lists the writing rules
-for comments.
+for comments and docs.
 
 ## Confidence Model
 

@@ -1021,6 +1021,70 @@ defmodule Llamex.ChecksTest do
       assert [] = issues(Llamex.Check.NoLLMismsInComments, source)
     end
 
+    test "flags a moduledoc heredoc and skips code inside it" do
+      source = """
+      defmodule Sample do
+        @moduledoc \"""
+        The cache key is the file digest.
+
+        We simply leverage the digest to keep things robust.
+
+        ```elixir
+        # we don't leverage this
+        ```
+
+            iex> should_not_count()
+            :ok
+        \"""
+
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+
+      assert issue.message ==
+               "Too many LLMisms and non-human text in docs: 3 found in 2 lines, limit 2 per 10 lines (word with no fact)"
+
+      assert issue.line_no == 5
+      assert issue.trigger == "simply"
+    end
+
+    test "flags @doc, @typedoc, and @shortdoc strings on their own line" do
+      source = """
+      defmodule Sample do
+        @doc "This should never happen."
+        def one, do: :ok
+
+        @typedoc ~S"This could be nil."
+        @type t :: term()
+
+        @shortdoc "Runs the task, it simply works."
+        def two, do: :ok
+      end
+      """
+
+      assert [doc, typedoc, shortdoc] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert doc.line_no == 2
+      assert typedoc.line_no == 5
+      assert shortdoc.line_no == 8
+      assert Enum.all?([doc, typedoc, shortdoc], &(&1.message =~ "in docs"))
+    end
+
+    test "skips @moduledoc false and doc attributes with options" do
+      source = """
+      defmodule Sample do
+        @moduledoc false
+
+        @doc since: "1.0"
+        @doc deprecated: "Should not count"
+        def helper, do: :ok
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoLLMismsInComments, source)
+    end
+
     test "honors the max_llmisms and window_lines params" do
       source = """
       defmodule Sample do
