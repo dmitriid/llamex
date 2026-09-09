@@ -86,8 +86,8 @@ defmodule Llamex.Check.NoMultipleAssigns do
   defp pipe_stages({:|>, _, [input, right]}), do: pipe_stages(input) ++ [right]
   defp pipe_stages(other), do: [other]
 
-  # The chain head can hold a full assign(socket, key, value) call, so
-  # arity 3 counts there. Piped stages hold assign(key, value) at arity 2.
+  # The chain head can contain a full assign(socket, key, value) call, so
+  # arity 3 counts there. Piped stages contain assign(key, value) at arity 2.
   defp single_key_assign?(node) do
     case AST.call_identity(node) do
       %{function: :assign, arity: arity, args: args} when arity in [2, 3] ->
