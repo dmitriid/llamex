@@ -933,6 +933,18 @@ defmodule Llamex.ChecksTest do
       assert issue.exit_status == 0
     end
 
+    test "matches words without regard to case" do
+      source = """
+      defmodule Sample do
+        # Simply retry. SHOULD never fail.
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.message =~ "2 found in 1 line"
+    end
+
     test "flags a block with more than two matches in ten lines" do
       source = """
       defmodule Sample do
@@ -1059,7 +1071,7 @@ defmodule Llamex.ChecksTest do
         @typedoc ~S"This could be nil."
         @type t :: term()
 
-        @shortdoc "Runs the task, it simply works."
+        @shortdoc "Simply runs the task."
         def two, do: :ok
       end
       """
