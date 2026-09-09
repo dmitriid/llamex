@@ -40,6 +40,9 @@ defmodule Llamex.Check.NoLLMismsInComments do
         "for example", "that is", "to", or "before".
       - State the fact. Do not label a fix as honest, clean, clever, or
         real.
+      - For sequences of actions, prefer lists over multiple short sentences
+        in a row.
+      - Do not use run-on sentences.
 
       A comment states a constraint that the code cannot express. Delete
       a comment that describes what the code visibly does.
