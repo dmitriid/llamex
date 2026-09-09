@@ -20,9 +20,21 @@ defmodule Llamex.Credo.AddChecks do
   end
 
   defp default_checks(exec) do
-    skip_tests = Keyword.get(exec.plugins[Llamex] || [], :skip_tests, true)
+    opts = exec.plugins[Llamex] || []
+    skip_tests = Keyword.get(opts, :skip_tests, true)
 
-    Enum.map(Llamex.checks(), &{&1, [skip_tests: skip_tests]})
+    Enum.map(Llamex.checks(), &{&1, [skip_tests: skip_tests]}) ++
+      optional_checks(opts, skip_tests)
+  end
+
+  defp optional_checks(opts, skip_tests) do
+    Enum.flat_map(Llamex.optional_checks(), fn {key, check} ->
+      case Keyword.get(opts, key) do
+        true -> [{check, [skip_tests: skip_tests]}]
+        params when is_list(params) -> [{check, Keyword.put_new(params, :skip_tests, skip_tests)}]
+        _disabled -> []
+      end
+    end)
   end
 
   defp keep_disabled_checks(enabled, checks) do

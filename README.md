@@ -1,7 +1,8 @@
 # Llamex
 
 Llamex is a Credo plugin suite. It detects issues that LLM-assisted Elixir
-refactors commonly introduce. The suite ships seven checks:
+refactors commonly introduce. The suite ships eight checks. The plugin
+enables seven of them by default:
 
 - `Llamex.Check.NoOneLiners`
 - `Llamex.Check.NoAdHocAshQueries`
@@ -10,6 +11,10 @@ refactors commonly introduce. The suite ships seven checks:
 - `Llamex.Check.NoAuthorizeBypass`
 - `Llamex.Check.NoSelfInLiveViews`
 - `Llamex.Check.NoMultipleAssigns`
+
+One check is optional. The plugin enables it only with a plugin option:
+
+- `Llamex.Check.NoLLMismsInComments`
 
 The checks detect problems and show useful messages. They do not apply
 automatic fixes.
@@ -68,6 +73,20 @@ and Mix task files by default. To lint those files too:
 ```elixir
 plugins: [
   {Llamex, [skip_tests: false]}
+]
+```
+
+To enable the optional `NoLLMismsInComments` check, set the
+`llmisms_in_comments` plugin option. Set it to `true` for the default
+params, or to a keyword list with check params:
+
+```elixir
+plugins: [
+  {Llamex, [llmisms_in_comments: true]}
+]
+
+plugins: [
+  {Llamex, [llmisms_in_comments: [max_llmisms: 1, window_lines: 5]]}
 ]
 ```
 
@@ -317,6 +336,101 @@ Default message:
 For readability, avoid multiple assign statements. Use socket |> assign(key1: ..., key2: ...)
 ```
 
+### NoLLMismsInComments
+
+Default severity: readability warning. This check does not change the exit
+status of `mix credo`. The build does not fail on its findings.
+
+The plugin does not enable this check by default. See the installation
+section for the `llmisms_in_comments` plugin option. You can also add the
+check module to `checks.extra` directly.
+
+This check scans each `#` comment block for phrases that language models
+write and people do not. A block is a run of comments on consecutive
+lines. The check reports a block when the count of matches is above the
+limit for the block size.
+
+The limit is a ratio: `max_llmisms` matches per `window_lines` lines. The
+default is 2 per 10. The ratio applies to blocks of every size:
+
+- A block of 10 lines can contain 2 matches. The third match is reported.
+- A block of 5 lines can contain 1 match.
+- A block of 1 line can contain 0 matches. One match is reported.
+- In a block longer than `window_lines`, the check scans every window of
+  `window_lines` consecutive lines.
+
+Params:
+
+| Param          | Default | Meaning                                              |
+| -------------- | ------- | ---------------------------------------------------- |
+| `max_llmisms`  | 2       | The number of matches that `window_lines` lines can contain. |
+| `window_lines` | 10      | The number of lines that `max_llmisms` applies to.   |
+| `skip_tests`   | true    | Skip test files and Mix task files.                  |
+
+To change the params without the plugin option, configure the check module
+directly:
+
+```elixir
+checks: %{
+  extra: [
+    {Llamex.Check.NoLLMismsInComments, [max_llmisms: 1, window_lines: 5]}
+  ]
+}
+```
+
+The check scans for these pattern classes:
+
+- em dashes and semicolons
+- contractions, for example `don't` and `it's`
+- the modals `should`, `would`, `could`, `might`, and `may`
+- present perfect forms, for example `has been` and `have changed`
+- words with no fact, for example `simply`, `robust`, `seamless`,
+  `leverage`, `elegant`
+- Latin abbreviations `e.g.` and `i.e.`, and the phrases `in order to`,
+  `prior to`, `in the event that`
+- filler phrases, for example `under the hood`, `worth noting`,
+  `keep in mind`, `deep dive`
+- metaphor verbs, for example `rescues`, `nudges`, `swallows`, `wires up`
+- the container verb `hold` and the status verb `stand`
+- fact-free adverbs, for example `honestly`, `obviously`, `clearly`
+- process narration, for example `let me`, `I will`, `now we`, `here we`
+- stalling phrases, user validation phrases, and self-blame phrases
+- noun metaphors, for example `guardrail`, `footgun`, `happy path`,
+  `silver bullet`
+- editorializing adjectives, for example `honest`, `hacky`, `clever`,
+  `clean fix`, `real solution`
+- narrative, contrast, template, design, and short-answer frames
+- `story`, `ground`, and `leg` as metaphors
+- comma chains with `then`, `but`, `so`, and `-ing` clauses
+- comment narration, for example `this ensures`, `note that`,
+  `make sure to`
+
+The check ignores inline code in backticks, URLs, and Credo directive
+comments. It does not scan `@moduledoc` and `@doc` strings.
+
+Flagged example:
+
+```elixir
+# This ensures that we don't leak the socket, keep in mind.
+def helper, do: :ok
+```
+
+Preferred form:
+
+```elixir
+# The socket closes in terminate/2. A leak here blocks the port.
+def helper, do: :ok
+```
+
+Default message:
+
+```text
+Too many LLMisms and non-human text in comments: 3 found in 1 line, limit 2 per 10 lines (contraction, filler phrase, comment narration)
+```
+
+The extended explanation from `mix credo explain` lists the writing rules
+for comments.
+
 ## Confidence Model
 
 Llamex classifies findings conservatively:
@@ -334,3 +448,5 @@ AST-only heuristics. It fails soft when Ash/Spark metadata is unavailable.
 - Dynamic dispatch, generated code, and complex macro expansion may be skipped.
 - Ash classification is AST-first. It does not require a full project index.
 - Checks do not rewrite code.
+- `NoLLMismsInComments` is a word list scan. It does not detect
+  metaphors outside its lists, sentence length, or passive voice.

@@ -16,6 +16,12 @@ defmodule Llamex.ChecksTest do
            ]
   end
 
+  test "exposes the optional check modules with their plugin options" do
+    assert Llamex.optional_checks() == [
+             llmisms_in_comments: Llamex.Check.NoLLMismsInComments
+           ]
+  end
+
   test "registers all checks through the Credo plugin entry point" do
     exec =
       Credo.Execution.build([])
@@ -44,6 +50,29 @@ defmodule Llamex.ChecksTest do
     assert {Llamex.Check.NoAuthorizeBypass, [skip_tests: true]} in exec.checks.enabled
     assert {Llamex.Check.NoSelfInLiveViews, [skip_tests: true]} in exec.checks.enabled
     assert {Llamex.Check.NoMultipleAssigns, [skip_tests: true]} in exec.checks.enabled
+    refute Keyword.has_key?(exec.checks.enabled, Llamex.Check.NoLLMismsInComments)
+  end
+
+  test "plugin option llmisms_in_comments: true injects the optional check" do
+    exec = %Credo.Execution{
+      plugins: [{Llamex, [llmisms_in_comments: true, skip_tests: false]}],
+      checks: %{enabled: [], disabled: []}
+    }
+
+    exec = AddChecks.call(exec, [])
+
+    assert {Llamex.Check.NoLLMismsInComments, [skip_tests: false]} in exec.checks.enabled
+  end
+
+  test "plugin option llmisms_in_comments accepts check params" do
+    exec = %Credo.Execution{
+      plugins: [{Llamex, [llmisms_in_comments: [max_llmisms: 1, window_lines: 5]]}],
+      checks: nil
+    }
+
+    exec = AddChecks.call(exec, [])
+
+    assert {Llamex.Check.NoLLMismsInComments, [skip_tests: true, max_llmisms: 1, window_lines: 5]} in exec.checks.enabled
   end
 
   test "plugin-level skip_tests config is propagated to injected checks" do
@@ -152,6 +181,13 @@ defmodule Llamex.ChecksTest do
            |> assign(:d, 4)
          end
        end
+       """},
+      {Llamex.Check.NoLLMismsInComments,
+       """
+       defmodule SampleTest do
+         # This ensures that we don't leak the socket, keep in mind.
+         def helper, do: :ok
+       end
        """}
     ]
 
@@ -183,7 +219,7 @@ defmodule Llamex.ChecksTest do
     end
     """
 
-    for check <- Llamex.checks() do
+    for check <- Llamex.checks() ++ Keyword.values(Llamex.optional_checks()) do
       assert [] = mix_task_issues(check, source)
     end
   end
@@ -875,6 +911,129 @@ defmodule Llamex.ChecksTest do
       """
 
       assert [_issue] = issues(Llamex.Check.NoMultipleAssigns, source, max_assigns: 1)
+    end
+  end
+
+  describe "NoLLMismsInComments" do
+    test "flags one match in a one-line comment" do
+      source = """
+      defmodule Sample do
+        # This should never happen.
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+
+      assert issue.message ==
+               "Too many LLMisms and non-human text in comments: 1 found in 1 line, limit 2 per 10 lines (banned modal)"
+
+      assert issue.line_no == 2
+      assert issue.trigger == "should"
+      assert issue.exit_status == 0
+    end
+
+    test "flags a block with more than two matches in ten lines" do
+      source = """
+      defmodule Sample do
+        # The cache key is the file digest.
+        # We simply leverage the digest to keep things robust.
+        # A new digest starts a new download.
+        # The old entry expires after 1 hour.
+        # The lock file guards the download.
+        # The lock has no owner after a crash.
+        # The worker removes the lock on start.
+        # The worker logs the removed lock.
+        # The log line names the file.
+        # The log line names the owner.
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.line_no == 3
+      assert issue.trigger == "simply"
+      assert issue.message =~ "3 found in 10 lines"
+    end
+
+    test "allows a block at the limit" do
+      source = """
+      defmodule Sample do
+        # The cache key is the file digest.
+        # A new digest starts a new download.
+        # The old entry expires after 1 hour.
+        # The lock file guards the download.
+        # The worker should remove the lock on start.
+        def helper, do: :ok
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoLLMismsInComments, source)
+    end
+
+    test "reports one issue per comment block" do
+      source = """
+      defmodule Sample do
+        # This should never happen.
+        def one, do: :ok
+
+        # We simply leverage the cache here.
+        def two, do: :ok
+      end
+      """
+
+      assert [first, second] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert first.line_no == 2
+      assert second.line_no == 5
+    end
+
+    test "scans a long block with a sliding window" do
+      lines =
+        for index <- 1..30 do
+          if index in [12, 13, 14] do
+            "  # This should never happen in step #{index}."
+          else
+            "  # Step #{index} writes the file."
+          end
+        end
+
+      source = """
+      defmodule Sample do
+      #{Enum.join(lines, "\n")}
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.line_no == 13
+      assert issue.message =~ "3 found in 10 lines"
+    end
+
+    test "ignores inline code, URLs, strings, and Credo directives" do
+      source = """
+      defmodule Sample do
+        # Write `don't` as two words. See https://example.com/don't-do-this
+        # credo:disable-for-next-line
+        def helper, do: "we don't leverage this"
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoLLMismsInComments, source)
+    end
+
+    test "honors the max_llmisms and window_lines params" do
+      source = """
+      defmodule Sample do
+        # The cache key is the file digest.
+        # A new digest starts a new download.
+        # The worker should remove the lock on start.
+        def helper, do: :ok
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoLLMismsInComments, source, max_llmisms: 4)
+      assert [] = issues(Llamex.Check.NoLLMismsInComments, source, window_lines: 3)
+      assert [_issue] = issues(Llamex.Check.NoLLMismsInComments, source, window_lines: 20)
     end
   end
 end

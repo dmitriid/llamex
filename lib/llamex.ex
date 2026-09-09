@@ -15,8 +15,21 @@ defmodule Llamex do
     Llamex.Check.NoMultipleAssigns
   ]
 
-  @doc "Returns all checks shipped by Llamex."
+  @optional_checks [
+    llmisms_in_comments: Llamex.Check.NoLLMismsInComments
+  ]
+
+  @doc "Returns all checks that the plugin enables by default."
   def checks, do: @checks
+
+  @doc """
+  Returns the checks that the plugin enables only on request.
+
+  Each key is a plugin option. Set the option to `true` to enable the
+  check with default params. Set it to a keyword list to enable the
+  check with those params.
+  """
+  def optional_checks, do: @optional_checks
 
   @doc false
   def init(exec) do
