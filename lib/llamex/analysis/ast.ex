@@ -69,18 +69,56 @@ defmodule Llamex.Analysis.AST do
   end
 
   def aliases(ast) do
-    walk(ast, fn
-      {:alias, _meta, [{:__aliases__, _, parts}]} ->
-        {List.last(parts), Module.concat(parts)}
+    walk_with_ancestors(ast, fn
+      {:alias, _meta, [{:__aliases__, _, parts}]}, ancestors ->
+        alias_entry(parts, nil, ancestors)
 
-      {:alias, _meta, [{:__aliases__, _, parts}, opts]} when is_list(opts) ->
-        as = Keyword.get(opts, :as, List.last(parts))
-        {as, Module.concat(parts)}
+      {:alias, _meta, [{:__aliases__, _, parts}, opts]}, ancestors when is_list(opts) ->
+        alias_entry(parts, Keyword.get(opts, :as), ancestors)
 
-      _ ->
+      _, _ ->
         nil
     end)
     |> Map.new()
+  end
+
+  defp alias_entry(parts, as, ancestors) do
+    with {:ok, resolved_parts} <- resolve_module_parts(parts, ancestors),
+         {:ok, as_name} <- resolve_as(as, resolved_parts) do
+      {as_name, Module.concat(resolved_parts)}
+    else
+      :error -> nil
+    end
+  end
+
+  defp resolve_module_parts([{:__MODULE__, _, _} | rest], ancestors) do
+    case enclosing_module_parts(ancestors) do
+      [] -> :error
+      module_parts -> {:ok, module_parts ++ rest}
+    end
+  end
+
+  defp resolve_module_parts(parts, _ancestors) do
+    if Enum.all?(parts, &is_atom/1), do: {:ok, parts}, else: :error
+  end
+
+  defp resolve_as(nil, resolved_parts), do: {:ok, List.last(resolved_parts)}
+  defp resolve_as(as, _resolved_parts) when is_atom(as), do: {:ok, as}
+
+  defp resolve_as({:__aliases__, _, as_parts}, _resolved_parts) do
+    case List.last(as_parts) do
+      name when is_atom(name) -> {:ok, name}
+      _ -> :error
+    end
+  end
+
+  defp resolve_as(_as, _resolved_parts), do: :error
+
+  defp enclosing_module_parts(ancestors) do
+    ancestors
+    |> Enum.filter(&match?({:defmodule, _, [{:__aliases__, _, _}, _]}, &1))
+    |> Enum.reverse()
+    |> Enum.flat_map(fn {:defmodule, _, [{:__aliases__, _, parts}, _]} -> parts end)
   end
 
   def opt_out?(ast, attribute) do
