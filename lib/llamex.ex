@@ -12,7 +12,8 @@ defmodule Llamex do
     Llamex.Check.NoDBWorkInMemory,
     Llamex.Check.NoAuthorizeBypass,
     Llamex.Check.NoSelfInLiveViews,
-    Llamex.Check.NoMultipleAssigns
+    Llamex.Check.NoMultipleAssigns,
+    Llamex.Check.NoAshReadForExistenceCheck
   ]
 
   @optional_checks [
