@@ -12,7 +12,8 @@ defmodule Llamex.ChecksTest do
              Llamex.Check.NoDBWorkInMemory,
              Llamex.Check.NoAuthorizeBypass,
              Llamex.Check.NoSelfInLiveViews,
-             Llamex.Check.NoMultipleAssigns
+             Llamex.Check.NoMultipleAssigns,
+             Llamex.Check.NoAshReadForExistenceCheck
            ]
   end
 
@@ -50,6 +51,9 @@ defmodule Llamex.ChecksTest do
     assert {Llamex.Check.NoAuthorizeBypass, [skip_tests: true]} in exec.checks.enabled
     assert {Llamex.Check.NoSelfInLiveViews, [skip_tests: true]} in exec.checks.enabled
     assert {Llamex.Check.NoMultipleAssigns, [skip_tests: true]} in exec.checks.enabled
+
+    assert {Llamex.Check.NoAshReadForExistenceCheck, [skip_tests: true]} in exec.checks.enabled
+
     refute Keyword.has_key?(exec.checks.enabled, Llamex.Check.NoLLMismsInComments)
   end
 
@@ -187,6 +191,17 @@ defmodule Llamex.ChecksTest do
        defmodule SampleTest do
          # This ensures that we don't leak the socket, keep in mind.
          def helper, do: :ok
+       end
+       """},
+      {Llamex.Check.NoAshReadForExistenceCheck,
+       """
+       defmodule SampleTest do
+         def helper(id) do
+           Resource
+           |> Ash.Query.filter(id: id)
+           |> Ash.read!()
+           |> Enum.any?()
+         end
        end
        """}
     ]
@@ -1110,6 +1125,111 @@ defmodule Llamex.ChecksTest do
       assert [] = issues(Llamex.Check.NoLLMismsInComments, source, max_llmisms: 4)
       assert [] = issues(Llamex.Check.NoLLMismsInComments, source, window_lines: 3)
       assert [_issue] = issues(Llamex.Check.NoLLMismsInComments, source, window_lines: 20)
+    end
+  end
+
+  describe "NoAshReadForExistenceCheck" do
+    test "flags a query capped with limit(1) and read into Enum.any?()" do
+      source = """
+      defmodule Sample do
+        def ticket_exists?(id) do
+          Ticket
+          |> Ash.Query.filter(id: id)
+          |> Ash.Query.limit(1)
+          |> Ash.read!()
+          |> Enum.any?()
+        end
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoAshReadForExistenceCheck, source)
+      assert issue.message =~ "Use Ash.exists?/1"
+      assert issue.trigger == "Enum.any?"
+    end
+
+    test "flags a plain Ash.read!/1 into Enum.any?()" do
+      source = """
+      defmodule Sample do
+        def ticket_exists?(id) do
+          Ash.read!(query) |> Enum.any?()
+        end
+      end
+      """
+
+      assert [_issue] = issues(Llamex.Check.NoAshReadForExistenceCheck, source)
+    end
+
+    test "flags Ash.read/1 as well as Ash.read!/1" do
+      source = """
+      defmodule Sample do
+        def ticket_exists?(id) do
+          Ticket
+          |> Ash.Query.filter(id: id)
+          |> Ash.read()
+          |> Enum.any?()
+        end
+      end
+      """
+
+      assert [_issue] = issues(Llamex.Check.NoAshReadForExistenceCheck, source)
+    end
+
+    test "allows Ash.exists?/1" do
+      source = """
+      defmodule Sample do
+        def ticket_exists?(id) do
+          Ticket
+          |> Ash.Query.filter(id: id)
+          |> Ash.exists?()
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoAshReadForExistenceCheck, source)
+    end
+
+    test "allows Enum.any?/1 with a predicate, since it is not a plain existence check" do
+      source = """
+      defmodule Sample do
+        def any_overdue?(id) do
+          Ticket
+          |> Ash.Query.filter(id: id)
+          |> Ash.read!()
+          |> Enum.any?(& &1.overdue?)
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoAshReadForExistenceCheck, source)
+    end
+
+    test "allows Enum.any?() when the input is not from an Ash read" do
+      source = """
+      defmodule Sample do
+        def any_selected?(ids) do
+          ids
+          |> Enum.filter(&(&1 > 0))
+          |> Enum.any?()
+        end
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoAshReadForExistenceCheck, source)
+    end
+
+    test "skips test files by default" do
+      source = """
+      defmodule SampleTest do
+        def ticket_exists?(id) do
+          Ticket
+          |> Ash.Query.filter(id: id)
+          |> Ash.read!()
+          |> Enum.any?()
+        end
+      end
+      """
+
+      assert [] = test_file_issues(Llamex.Check.NoAshReadForExistenceCheck, source)
     end
   end
 end
