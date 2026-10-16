@@ -406,6 +406,44 @@ The check scans for these pattern classes:
 - comma chains with `then`, `but`, `so`, and `-ing` clauses
 - comment narration, for example `this ensures`, `note that`,
   `make sure to`
+- banned words, for example `fails loudly`, `spearheaded`, `crutch`
+- the container verb `carry`
+- LLM vocabulary, for example `pivotal`, `crucial`, `tapestry`,
+  `streamline`, `empower`
+- chat openers at the start of a line, for example `Sure`, `Certainly`,
+  `Great question`
+- chat closers, for example `hope this helps`, `feel free to`
+- chat assistant voice, for example `as an AI`, `my training data`
+- contrast cliches, for example `not just X but Y` and `X, not Y:`
+- rhetorical questions with an answer, for example `The catch? A race.`
+- list items that start with a bold label or with an emoji
+- dramatic failure verbs, for example `blows up`, `falls over`,
+  `chokes on`
+- parenthetical asides that start with `and`, `but`, or `plus`
+- talk about the change under review, for example `no longer`,
+  `for now`, `this PR`, `quick fix`, and `Previously` at the start of a
+  sentence
+- quoted error messages, for example `"Invalid header"`
+- comments that describe the code at the start of a line, for example
+  `Loop over`, `This function`, `Sets the`
+
+The check also reads the shape of each block. A paragraph is a run of
+consecutive lines with no blank line. Headings, tables, and fenced code
+end a paragraph. A list item starts a new paragraph. Inline code and
+URLs count as one word each. The shape findings are:
+
+- a sentence with more than 25 words
+- a paragraph with more than 120 words or more than 6 sentences
+- a line that ends on a word that cannot end a phrase, for example
+  `the`, `of`, or `and`, when the next line continues the paragraph
+- 3 or more paragraphs in a row with almost the same word count
+- 4 or more sentences in one paragraph with almost the same word count
+
+Each shape finding counts as one match on the line where it starts.
+
+The new pattern classes and the shape findings come from the
+[nollm](https://github.com/NullVoxPopuli/nollm) rule list. The sentence
+and paragraph limits come from ASD-STE100.
 
 The check ignores inline code in backticks, URLs, and Credo directive
 comments. In doc strings, it also ignores blank lines, fenced code
@@ -455,5 +493,5 @@ AST-only heuristics. It fails soft when Ash/Spark metadata is unavailable.
 - Dynamic dispatch, generated code, and complex macro expansion may be skipped.
 - Ash classification is AST-first. It does not require a full project index.
 - Checks do not rewrite code.
-- `NoLLMismsInComments` is a word list scan. It does not detect
-  metaphors outside its lists, sentence length, or passive voice.
+- `NoLLMismsInComments` is a word list scan with a few shape checks. It
+  does not detect metaphors outside its lists or passive voice.

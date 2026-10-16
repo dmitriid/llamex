@@ -45,6 +45,20 @@ defmodule Llamex.Check.NoLLMismsInComments do
       - For sequences of actions, prefer lists over multiple short sentences
         in a row.
       - Do not use run-on sentences.
+      - Do not write more than 25 words in a sentence or more than 6
+        sentences in a paragraph.
+      - Break a line where there is a pause. Do not end a line on "the",
+        "of", "and", or a similar word.
+      - Vary the length of sentences and paragraphs.
+      - Do not write chat text: openers ("Sure"), closers ("hope this
+        helps"), or the voice of a chat assistant ("as an AI").
+      - Do not write about the change under review: "no longer", "for
+        now", "this PR", "previously". Write that text in the pull
+        request.
+      - Do not quote an error message. Write what fails and why.
+      - Do not use dramatic verbs: "blows up", "falls over". Write what
+        happens: raises, hangs, returns nil.
+      - Do not start a list item with a bold label or an emoji.
 
       A comment states a constraint that the code cannot express. Delete
       a comment that describes what the code visibly does.
@@ -86,8 +100,13 @@ defmodule Llamex.Check.NoLLMismsInComments do
   end
 
   defp block_issues({kind, block}, limit, issue_meta) do
+    shape = block |> Prose.shape() |> Enum.group_by(& &1.line, &Map.delete(&1, :line))
+
     scanned =
-      Enum.map(block, &%{line: &1.line, findings: &1.text |> Prose.strip_noise() |> Prose.scan()})
+      Enum.map(block, fn line ->
+        findings = line.text |> Prose.strip_noise() |> Prose.scan()
+        %{line: line.line, findings: findings ++ Map.get(shape, line.line, [])}
+      end)
 
     window_size = min(limit.window_lines, length(scanned))
 
