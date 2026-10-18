@@ -38,7 +38,8 @@ defmodule Llamex.Analysis.LLMisms do
     - Do not use "e.g.", "i.e.", "in order to", or "prior to". Write
       "for example", "that is", "to", or "before".
     - State the fact. Do not label a fix as honest, clean, clever, or
-      real.
+      real. Do not label a problem as real or serious.
+    - Do not call a missing part a "gap". Write what is missing.
     - For sequences of actions, prefer lists over multiple short sentences
       in a row.
     - Do not use run-on sentences.

@@ -423,9 +423,9 @@ The check scans for these pattern classes:
 - process narration, for example `let me`, `I will`, `now we`, `here we`
 - stalling phrases, user validation phrases, and self-blame phrases
 - noun metaphors, for example `guardrail`, `footgun`, `happy path`,
-  `silver bullet`
+  `silver bullet`, `a gap in`
 - editorializing adjectives, for example `honest`, `hacky`, `clever`,
-  `clean fix`, `real solution`
+  `clean fix`, `real solution`, `real gap`, `serious issue`
 - narrative, contrast, template, design, and short-answer frames
 - `story`, `ground`, and `leg` as metaphors
 - comma chains with `then`, `but`, `so`, and `-ing` clauses

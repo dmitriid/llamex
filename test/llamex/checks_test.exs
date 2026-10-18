@@ -1144,7 +1144,9 @@ defmodule Llamex.ChecksTest do
             {"The catch? A race.", "rhetorical question"},
             {"The worker stops (and logs the error).", "parenthetical aside"},
             {"- **Key:** the file digest.", "list item with a bold label"},
-            {"- \u{1F680} the file digest.", "list item that starts with an emoji"}
+            {"- \u{1F680} the file digest.", "list item that starts with an emoji"},
+            {"The parser has a small gap in the header check.", "noun metaphor"},
+            {"The race is a real issue.", "editorializing adjective"}
           ] do
         source = """
         defmodule Sample do
@@ -1156,6 +1158,20 @@ defmodule Llamex.ChecksTest do
         assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
         assert issue.message =~ "(#{class})"
       end
+    end
+
+    test "flags each LLMism in a review finding about a missing part" do
+      source = """
+      defmodule Sample do
+        # item 1 is a real gap in the code.
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.message =~ "2 found in 1 line"
+      assert issue.message =~ "editorializing adjective"
+      assert issue.message =~ "noun metaphor"
     end
 
     test "flags comment-only text about the change, quoted errors, and code narration" do
