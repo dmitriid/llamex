@@ -18,7 +18,8 @@ defmodule Llamex.ChecksTest do
 
   test "exposes the optional check modules with their plugin options" do
     assert Llamex.optional_checks() == [
-             llmisms_in_comments: Llamex.Check.NoLLMismsInComments
+             llmisms_in_comments: Llamex.Check.NoLLMismsInComments,
+             llmisms_in_markdown: Llamex.Check.NoLLMismsInMarkdown
            ]
   end
 
@@ -31,6 +32,10 @@ defmodule Llamex.ChecksTest do
     validate_config_tasks = exec.pipeline_map[Credo.Execution][:validate_config]
 
     assert {Llamex.Credo.AddChecks, []} in validate_config_tasks
+
+    for command <- ["suggest", "list", "diff"] do
+      assert {Llamex.Credo.AddMarkdownFiles, []} in exec.pipeline_map[command][:run_analysis]
+    end
   end
 
   test "injects plugin checks when a project config uses checks.enabled" do
@@ -73,6 +78,17 @@ defmodule Llamex.ChecksTest do
     exec = AddChecks.call(exec, [])
 
     assert {Llamex.Check.NoLLMismsInComments, [skip_tests: true, max_llmisms: 1, window_lines: 5]} in exec.checks.enabled
+  end
+
+  test "plugin option llmisms_in_markdown injects the Markdown check without skip_tests" do
+    exec = %Credo.Execution{
+      plugins: [{Llamex, [llmisms_in_markdown: true, skip_tests: false]}],
+      checks: %{enabled: [], disabled: []}
+    }
+
+    exec = AddChecks.call(exec, [])
+
+    assert {Llamex.Check.NoLLMismsInMarkdown, []} in exec.checks.enabled
   end
 
   test "plugin-level skip_tests config is propagated to injected checks" do
@@ -219,7 +235,9 @@ defmodule Llamex.ChecksTest do
     end
     """
 
-    for check <- Llamex.checks() ++ Keyword.values(Llamex.optional_checks()) do
+    checks = Llamex.checks() ++ Keyword.values(Llamex.optional_checks())
+
+    for check <- checks, :skip_tests in check.param_names() do
       assert [] = mix_task_issues(check, source)
     end
   end

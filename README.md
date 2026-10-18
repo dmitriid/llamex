@@ -1,7 +1,7 @@
 # Llamex
 
 Llamex is a Credo plugin suite. It detects issues that LLM-assisted Elixir
-refactors commonly introduce. The suite ships eight checks. The plugin
+refactors commonly introduce. The suite ships nine checks. The plugin
 enables seven of them by default:
 
 - `Llamex.Check.NoOneLiners`
@@ -12,9 +12,10 @@ enables seven of them by default:
 - `Llamex.Check.NoSelfInLiveViews`
 - `Llamex.Check.NoMultipleAssigns`
 
-One check is optional. The plugin enables it only with a plugin option:
+Two checks are optional. The plugin enables them only with plugin options:
 
 - `Llamex.Check.NoLLMismsInComments`
+- `Llamex.Check.NoLLMismsInMarkdown`
 
 The checks detect problems and show useful messages. They do not apply
 automatic fixes.
@@ -90,6 +91,29 @@ plugins: [
 ]
 ```
 
+To enable the optional `NoLLMismsInMarkdown` check, set the
+`llmisms_in_markdown` plugin option. The values are the same as for
+`llmisms_in_comments`. This check needs the `:mdex` package. Llamex
+declares `:mdex` as an optional dependency, so add it to your project:
+
+```elixir
+def deps do
+  [
+    {:mdex, "~> 0.14", only: [:dev, :test], runtime: false}
+  ]
+end
+```
+
+```elixir
+plugins: [
+  {Llamex, [llmisms_in_comments: true, llmisms_in_markdown: true]}
+]
+
+plugins: [
+  {Llamex, [llmisms_in_markdown: [paths: ["*.md", "docs/**/*.md"]]]}
+]
+```
+
 To enable only selected checks, configure those modules directly:
 
 ```elixir
@@ -108,8 +132,9 @@ To enable only selected checks, configure those modules directly:
 }
 ```
 
-Every check supports `skip_tests`, which defaults to `true`. When enabled, it
-skips files under `test/`, `*_test.exs` files, and files under `lib/mix/tasks/`.
+Every check except `NoLLMismsInMarkdown` supports `skip_tests`, which
+defaults to `true`. When enabled, it skips files under `test/`, `*_test.exs`
+files, and files under `lib/mix/tasks/`.
 
 ## Checks
 
@@ -476,6 +501,60 @@ Too many LLMisms and non-human text in docs: 3 found in 2 lines, limit 2 per 10 
 The extended explanation from `mix credo explain` lists the writing rules
 for comments and docs.
 
+### NoLLMismsInMarkdown
+
+Default severity: readability warning. The LLMism findings do not change
+the exit status of `mix credo`. A file that is not UTF-8 text fails the
+build. See below.
+
+The plugin does not enable this check by default. See the installation
+section for the `llmisms_in_markdown` plugin option.
+
+This check scans the Markdown files of the project with the same patterns,
+shape checks, and limit as `NoLLMismsInComments`. Each heading starts a new
+section. The text before the first heading is one section. The check
+reports a section when the count of matches is above the limit for the
+section size. The check reports one issue per section at most.
+
+The check uses the `:mdex` package to parse the files. It does not scan
+code blocks, HTML blocks, HTML comments, front matter, or blank lines.
+Indented lines inside list items are list text, not code. If `:mdex` is
+not available, the check shows a warning and reports no issues.
+
+A file that is not UTF-8 text gets an issue in the warning category. That
+issue changes the exit status of `mix credo`, so the build fails. The
+message gives the first line with bytes that are not UTF-8:
+
+```text
+Markdown file is not UTF-8 text: line 3 has bytes that are not UTF-8
+```
+
+Params:
+
+| Param            | Default                                             | Meaning                                         |
+| ---------------- | --------------------------------------------------- | ----------------------------------------------- |
+| `paths`          | `["**/*.md"]`                                       | The glob patterns of the Markdown files to scan. |
+| `excluded_paths` | `["deps/**", "_build/**", "cover/**", "tmp/**", "**/node_modules/**"]` | The glob patterns of the Markdown files to skip. |
+| `max_llmisms`    | 2                                                   | The number of matches that `window_lines` lines can contain. |
+| `window_lines`   | 10                                                  | The number of lines that `max_llmisms` applies to. |
+
+The patterns are relative to the directory where `mix credo` runs. The
+`**` pattern does not match hidden directories, for example `.github/`.
+To scan a hidden directory, add a pattern for it, for example
+`".github/**/*.md"`.
+
+The Markdown files are not Elixir source files. Credo does not run its
+other checks on them. After the analysis, the plugin adds the Markdown
+files with issues to the Credo file list. Credo needs that list to print
+the source line of an issue in `--verbose` mode. Thus, keep `Llamex` in
+the `plugins` list when you configure this check in `checks.extra`.
+
+Default message:
+
+```text
+Too many LLMisms and non-human text in markdown: 3 found in 2 lines, limit 2 per 10 lines (word with no fact)
+```
+
 ## Confidence Model
 
 Llamex classifies findings conservatively:
@@ -493,5 +572,8 @@ AST-only heuristics. It fails soft when Ash/Spark metadata is unavailable.
 - Dynamic dispatch, generated code, and complex macro expansion may be skipped.
 - Ash classification is AST-first. It does not require a full project index.
 - Checks do not rewrite code.
-- `NoLLMismsInComments` is a word list scan with a few shape checks. It
-  does not detect metaphors outside its lists or passive voice.
+- `NoLLMismsInComments` and `NoLLMismsInMarkdown` are word list scans with
+  a few shape checks. They do not detect metaphors outside their lists or
+  passive voice.
+- `NoLLMismsInMarkdown` scans the Markdown files on every `mix credo` run,
+  also when the command names one source file.
