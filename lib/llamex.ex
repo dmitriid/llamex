@@ -17,8 +17,12 @@ defmodule Llamex do
   ]
 
   @optional_checks [
-    llmisms_in_comments: Llamex.Check.NoLLMismsInComments
+    llmisms_in_comments: Llamex.Check.NoLLMismsInComments,
+    llmisms_in_markdown: Llamex.Check.NoLLMismsInMarkdown
   ]
+
+  # The Credo commands that print issues with their source lines.
+  @analysis_commands ["suggest", "list", "diff"]
 
   @doc "Returns all checks that the plugin enables by default."
   def checks, do: @checks
@@ -34,6 +38,10 @@ defmodule Llamex do
 
   @doc false
   def init(exec) do
-    prepend_task(exec, :validate_config, Llamex.Credo.AddChecks)
+    exec = prepend_task(exec, :validate_config, Llamex.Credo.AddChecks)
+
+    Enum.reduce(@analysis_commands, exec, fn command, exec ->
+      append_task(exec, command, :run_analysis, Llamex.Credo.AddMarkdownFiles)
+    end)
   end
 end
