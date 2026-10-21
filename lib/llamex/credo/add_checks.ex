@@ -30,11 +30,20 @@ defmodule Llamex.Credo.AddChecks do
   defp optional_checks(opts, skip_tests) do
     Enum.flat_map(Llamex.optional_checks(), fn {key, check} ->
       case Keyword.get(opts, key) do
-        true -> [{check, [skip_tests: skip_tests]}]
-        params when is_list(params) -> [{check, Keyword.put_new(params, :skip_tests, skip_tests)}]
+        true -> [{check, put_skip_tests([], check, skip_tests)}]
+        params when is_list(params) -> [{check, put_skip_tests(params, check, skip_tests)}]
         _disabled -> []
       end
     end)
+  end
+
+  # Credo warns about a param that the check does not declare.
+  defp put_skip_tests(params, check, skip_tests) do
+    if :skip_tests in check.param_names() do
+      Keyword.put_new(params, :skip_tests, skip_tests)
+    else
+      params
+    end
   end
 
   defp keep_disabled_checks(enabled, checks) do

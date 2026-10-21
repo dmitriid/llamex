@@ -18,7 +18,8 @@ defmodule Llamex.ChecksTest do
 
   test "exposes the optional check modules with their plugin options" do
     assert Llamex.optional_checks() == [
-             llmisms_in_comments: Llamex.Check.NoLLMismsInComments
+             llmisms_in_comments: Llamex.Check.NoLLMismsInComments,
+             llmisms_in_markdown: Llamex.Check.NoLLMismsInMarkdown
            ]
   end
 
@@ -31,6 +32,10 @@ defmodule Llamex.ChecksTest do
     validate_config_tasks = exec.pipeline_map[Credo.Execution][:validate_config]
 
     assert {Llamex.Credo.AddChecks, []} in validate_config_tasks
+
+    for command <- ["suggest", "list", "diff"] do
+      assert {Llamex.Credo.AddMarkdownFiles, []} in exec.pipeline_map[command][:run_analysis]
+    end
   end
 
   test "injects plugin checks when a project config uses checks.enabled" do
@@ -73,6 +78,17 @@ defmodule Llamex.ChecksTest do
     exec = AddChecks.call(exec, [])
 
     assert {Llamex.Check.NoLLMismsInComments, [skip_tests: true, max_llmisms: 1, window_lines: 5]} in exec.checks.enabled
+  end
+
+  test "plugin option llmisms_in_markdown injects the Markdown check without skip_tests" do
+    exec = %Credo.Execution{
+      plugins: [{Llamex, [llmisms_in_markdown: true, skip_tests: false]}],
+      checks: %{enabled: [], disabled: []}
+    }
+
+    exec = AddChecks.call(exec, [])
+
+    assert {Llamex.Check.NoLLMismsInMarkdown, []} in exec.checks.enabled
   end
 
   test "plugin-level skip_tests config is propagated to injected checks" do
@@ -219,7 +235,9 @@ defmodule Llamex.ChecksTest do
     end
     """
 
-    for check <- Llamex.checks() ++ Keyword.values(Llamex.optional_checks()) do
+    checks = Llamex.checks() ++ Keyword.values(Llamex.optional_checks())
+
+    for check <- checks, :skip_tests in check.param_names() do
       assert [] = mix_task_issues(check, source)
     end
   end
@@ -972,6 +990,7 @@ defmodule Llamex.ChecksTest do
         # We simply leverage the digest to keep things robust.
         # A new digest starts a new download.
         # The old entry expires after 1 hour.
+        #
         # The lock file guards the download.
         # The lock has no owner after a crash.
         # The worker removes the lock on start.
@@ -1130,6 +1149,154 @@ defmodule Llamex.ChecksTest do
       assert [] = issues(Llamex.Check.NoLLMismsInComments, source, max_llmisms: 4)
       assert [] = issues(Llamex.Check.NoLLMismsInComments, source, window_lines: 3)
       assert [_issue] = issues(Llamex.Check.NoLLMismsInComments, source, window_lines: 20)
+    end
+
+    test "flags chat text, LLM vocabulary, and dramatic verbs" do
+      for {comment, class} <- [
+            {"Sure, the cache is ready.", "chat opener"},
+            {"Hope that helps.", "chat closer"},
+            {"As an AI, the scope is narrow.", "chat assistant voice"},
+            {"The cache is a pivotal part.", "LLM vocabulary"},
+            {"The worker blows up on nil.", "dramatic failure verb"},
+            {"The test fails loudly on nil.", "banned word"},
+            {"The struct is carrying the state.", "container verb 'carry'"},
+            {"The cache is not just a map but a store.", "contrast cliche"},
+            {"The catch? A race.", "rhetorical question"},
+            {"The worker stops (and logs the error).", "parenthetical aside"},
+            {"- **Key:** the file digest.", "list item with a bold label"},
+            {"- \u{1F680} the file digest.", "list item that starts with an emoji"},
+            {"The parser has a small gap in the header check.", "noun metaphor"},
+            {"The race is a real issue.", "editorializing adjective"}
+          ] do
+        source = """
+        defmodule Sample do
+          # #{comment}
+          def helper, do: :ok
+        end
+        """
+
+        assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+        assert issue.message =~ "(#{class})"
+      end
+    end
+
+    test "flags each LLMism in a review finding about a missing part" do
+      source = """
+      defmodule Sample do
+        # item 1 is a real gap in the code.
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.message =~ "2 found in 1 line"
+      assert issue.message =~ "editorializing adjective"
+      assert issue.message =~ "noun metaphor"
+    end
+
+    test "flags comment-only text about the change, quoted errors, and code narration" do
+      for {comment, class} <- [
+            {"The parser no longer reads the header.", "talk about the change under review"},
+            {"Previously the parser read the header.", "talk about the change under review"},
+            {~s(The parser returns "Invalid header" for an empty file.), "quoted error message"},
+            {"Loop over the entries.", "comment that describes the code"}
+          ] do
+        source = """
+        defmodule Sample do
+          # #{comment}
+          def helper, do: :ok
+        end
+        """
+
+        assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+        assert issue.message =~ "(#{class})"
+      end
+    end
+
+    test "flags a line break in the middle of a phrase" do
+      source = """
+      defmodule Sample do
+        # The worker reads the
+        # file from the disk.
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.message =~ "(line break in the middle of a phrase)"
+      assert issue.line_no == 2
+      assert issue.trigger == "the"
+    end
+
+    test "flags a long sentence on the line where the sentence starts" do
+      source = """
+      defmodule Sample do
+        # The cache key is the file digest. The worker reads each file
+        # once and computes the digest and stores it next to the file name
+        # and the size and the owner and the time of the last read.
+        def helper, do: :ok
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.message =~ "(long sentence)"
+      assert issue.line_no == 2
+      assert issue.trigger == "The worker reads each file once..."
+    end
+
+    test "flags a wall of text and sentences of the same length in a doc string" do
+      wall = String.duplicate("The worker reads the file. ", 7)
+      uniform = String.duplicate("The worker reads the file from the disk again. ", 4)
+
+      source = """
+      defmodule Sample do
+        @doc "#{wall}"
+        def one, do: :ok
+
+        @doc "#{uniform}"
+        def two, do: :ok
+      end
+      """
+
+      assert [wall_issue, uniform_issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert wall_issue.message =~ "(wall of text)"
+      assert uniform_issue.message =~ "(sentences of the same length)"
+    end
+
+    test "flags paragraphs of the same length" do
+      paragraph =
+        "The worker reads the file from the disk and checks the digest of every entry in it. " <>
+          "The file is small. The worker logs the result."
+
+      source = """
+      defmodule Sample do
+        @moduledoc \"\"\"
+        #{paragraph}
+
+        #{paragraph}
+
+        #{paragraph}
+        \"\"\"
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.message =~ "(paragraphs of the same length)"
+    end
+
+    test "counts inline code as one word and skips fenced code in shape checks" do
+      source = """
+      defmodule Sample do
+        # The worker calls `Cache.fetch(key, ttl: 60, owner: self())`.
+        # ```
+        # the worker reads the
+        # file from the disk
+        # ```
+        def helper, do: :ok
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoLLMismsInComments, source)
     end
   end
 end

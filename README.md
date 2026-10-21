@@ -1,7 +1,7 @@
 # Llamex
 
 Llamex is a Credo plugin suite. It detects issues that LLM-assisted Elixir
-refactors commonly introduce. The suite ships eight checks. The plugin
+refactors commonly introduce. The suite ships nine checks. The plugin
 enables seven of them by default:
 
 - `Llamex.Check.NoOneLiners`
@@ -12,9 +12,10 @@ enables seven of them by default:
 - `Llamex.Check.NoSelfInLiveViews`
 - `Llamex.Check.NoMultipleAssigns`
 
-One check is optional. The plugin enables it only with a plugin option:
+Two checks are optional. The plugin enables them only with plugin options:
 
 - `Llamex.Check.NoLLMismsInComments`
+- `Llamex.Check.NoLLMismsInMarkdown`
 
 The checks detect problems and show useful messages. They do not apply
 automatic fixes.
@@ -90,6 +91,29 @@ plugins: [
 ]
 ```
 
+To enable the optional `NoLLMismsInMarkdown` check, set the
+`llmisms_in_markdown` plugin option. The values are the same as for
+`llmisms_in_comments`. This check needs the `:mdex` package. Llamex
+declares `:mdex` as an optional dependency, so add it to your project:
+
+```elixir
+def deps do
+  [
+    {:mdex, "~> 0.14", only: [:dev, :test], runtime: false}
+  ]
+end
+```
+
+```elixir
+plugins: [
+  {Llamex, [llmisms_in_comments: true, llmisms_in_markdown: true]}
+]
+
+plugins: [
+  {Llamex, [llmisms_in_markdown: [paths: ["*.md", "docs/**/*.md"]]]}
+]
+```
+
 To enable only selected checks, configure those modules directly:
 
 ```elixir
@@ -108,8 +132,9 @@ To enable only selected checks, configure those modules directly:
 }
 ```
 
-Every check supports `skip_tests`, which defaults to `true`. When enabled, it
-skips files under `test/`, `*_test.exs` files, and files under `lib/mix/tasks/`.
+Every check except `NoLLMismsInMarkdown` supports `skip_tests`, which
+defaults to `true`. When enabled, it skips files under `test/`, `*_test.exs`
+files, and files under `lib/mix/tasks/`.
 
 ## Checks
 
@@ -398,14 +423,52 @@ The check scans for these pattern classes:
 - process narration, for example `let me`, `I will`, `now we`, `here we`
 - stalling phrases, user validation phrases, and self-blame phrases
 - noun metaphors, for example `guardrail`, `footgun`, `happy path`,
-  `silver bullet`
+  `silver bullet`, `a gap in`
 - editorializing adjectives, for example `honest`, `hacky`, `clever`,
-  `clean fix`, `real solution`
+  `clean fix`, `real solution`, `real gap`, `serious issue`
 - narrative, contrast, template, design, and short-answer frames
 - `story`, `ground`, and `leg` as metaphors
 - comma chains with `then`, `but`, `so`, and `-ing` clauses
 - comment narration, for example `this ensures`, `note that`,
   `make sure to`
+- banned words, for example `fails loudly`, `spearheaded`, `crutch`
+- the container verb `carry`
+- LLM vocabulary, for example `pivotal`, `crucial`, `tapestry`,
+  `streamline`, `empower`
+- chat openers at the start of a line, for example `Sure`, `Certainly`,
+  `Great question`
+- chat closers, for example `hope this helps`, `feel free to`
+- chat assistant voice, for example `as an AI`, `my training data`
+- contrast cliches, for example `not just X but Y` and `X, not Y:`
+- rhetorical questions with an answer, for example `The catch? A race.`
+- list items that start with a bold label or with an emoji
+- dramatic failure verbs, for example `blows up`, `falls over`,
+  `chokes on`
+- parenthetical asides that start with `and`, `but`, or `plus`
+- talk about the change under review, for example `no longer`,
+  `for now`, `this PR`, `quick fix`, and `Previously` at the start of a
+  sentence
+- quoted error messages, for example `"Invalid header"`
+- comments that describe the code at the start of a line, for example
+  `Loop over`, `This function`, `Sets the`
+
+The check also reads the shape of each block. A paragraph is a run of
+consecutive lines with no blank line. Headings, tables, and fenced code
+end a paragraph. A list item starts a new paragraph. Inline code and
+URLs count as one word each. The shape findings are:
+
+- a sentence with more than 25 words
+- a paragraph with more than 120 words or more than 6 sentences
+- a line that ends on a word that cannot end a phrase, for example
+  `the`, `of`, or `and`, when the next line continues the paragraph
+- 3 or more paragraphs in a row with almost the same word count
+- 4 or more sentences in one paragraph with almost the same word count
+
+Each shape finding counts as one match on the line where it starts.
+
+The new pattern classes and the shape findings come from the
+[nollm](https://github.com/NullVoxPopuli/nollm) rule list. The sentence
+and paragraph limits come from ASD-STE100.
 
 The check ignores inline code in backticks, URLs, and Credo directive
 comments. In doc strings, it also ignores blank lines, fenced code
@@ -438,6 +501,60 @@ Too many LLMisms and non-human text in docs: 3 found in 2 lines, limit 2 per 10 
 The extended explanation from `mix credo explain` lists the writing rules
 for comments and docs.
 
+### NoLLMismsInMarkdown
+
+Default severity: readability warning. The LLMism findings do not change
+the exit status of `mix credo`. A file that is not UTF-8 text fails the
+build. See below.
+
+The plugin does not enable this check by default. See the installation
+section for the `llmisms_in_markdown` plugin option.
+
+This check scans the Markdown files of the project with the same patterns,
+shape checks, and limit as `NoLLMismsInComments`. Each heading starts a new
+section. The text before the first heading is one section. The check
+reports a section when the count of matches is above the limit for the
+section size. The check reports one issue per section at most.
+
+The check uses the `:mdex` package to parse the files. It does not scan
+code blocks, HTML blocks, HTML comments, front matter, or blank lines.
+Indented lines inside list items are list text, not code. If `:mdex` is
+not available, the check shows a warning and reports no issues.
+
+A file that is not UTF-8 text gets an issue in the warning category. That
+issue changes the exit status of `mix credo`, so the build fails. The
+message gives the first line with bytes that are not UTF-8:
+
+```text
+Markdown file is not UTF-8 text: line 3 has bytes that are not UTF-8
+```
+
+Params:
+
+| Param            | Default                                             | Meaning                                         |
+| ---------------- | --------------------------------------------------- | ----------------------------------------------- |
+| `paths`          | `["**/*.md"]`                                       | The glob patterns of the Markdown files to scan. |
+| `excluded_paths` | `["deps/**", "_build/**", "cover/**", "tmp/**", "**/node_modules/**"]` | The glob patterns of the Markdown files to skip. |
+| `max_llmisms`    | 2                                                   | The number of matches that `window_lines` lines can contain. |
+| `window_lines`   | 10                                                  | The number of lines that `max_llmisms` applies to. |
+
+The patterns are relative to the directory where `mix credo` runs. The
+`**` pattern does not match hidden directories, for example `.github/`.
+To scan a hidden directory, add a pattern for it, for example
+`".github/**/*.md"`.
+
+The Markdown files are not Elixir source files. Credo does not run its
+other checks on them. After the analysis, the plugin adds the Markdown
+files with issues to the Credo file list. Credo needs that list to print
+the source line of an issue in `--verbose` mode. Thus, keep `Llamex` in
+the `plugins` list when you configure this check in `checks.extra`.
+
+Default message:
+
+```text
+Too many LLMisms and non-human text in markdown: 3 found in 2 lines, limit 2 per 10 lines (word with no fact)
+```
+
 ## Confidence Model
 
 Llamex classifies findings conservatively:
@@ -455,5 +572,8 @@ AST-only heuristics. It fails soft when Ash/Spark metadata is unavailable.
 - Dynamic dispatch, generated code, and complex macro expansion may be skipped.
 - Ash classification is AST-first. It does not require a full project index.
 - Checks do not rewrite code.
-- `NoLLMismsInComments` is a word list scan. It does not detect
-  metaphors outside its lists, sentence length, or passive voice.
+- `NoLLMismsInComments` and `NoLLMismsInMarkdown` are word list scans with
+  a few shape checks. They do not detect metaphors outside their lists or
+  passive voice.
+- `NoLLMismsInMarkdown` scans the Markdown files on every `mix credo` run,
+  also when the command names one source file.
