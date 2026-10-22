@@ -647,6 +647,26 @@ defmodule Llamex.ChecksTest do
 
       assert [] = issues(Llamex.Check.NoDBWorkInMemory, source)
     end
+
+    test "does not crash on aliases relative to __MODULE__" do
+      source = """
+      defmodule Sample do
+        alias __MODULE__.Books
+        alias __MODULE__.Books, as: BooksAlias
+
+        def show_invalid_records do
+          books = Books.get_all_books!()
+
+          books
+          |> Enum.reject(&is_nil/1)
+          |> Enum.filter(&(&1.status == :invalid))
+        end
+      end
+      """
+
+      assert [issue | _] = issues(Llamex.Check.NoDBWorkInMemory, source)
+      assert issue.message =~ "Do not operate on the whole dataset in memory"
+    end
   end
 
   describe "NoAuthorizeBypass" do
