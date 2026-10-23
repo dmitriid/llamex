@@ -306,15 +306,6 @@ defmodule Llamex.Analysis.Prose do
     "declare"
   ]
 
-  # A line that ends on one of these words stops in the middle of a
-  # phrase. The list is the nollm list.
-  @dangling_words ~w(a an the of to in on at by for with from into onto upon over under
-                     about across after before between during through toward towards
-                     within without against among around beyond per via and or but nor
-                     that which who whom whose if when while because although though
-                     unless until since whether is are was were has have had its their
-                     your our my every)
-
   # The sentence and paragraph limits come from ASD-STE100. The other
   # limits are the nollm defaults.
   @long_sentence_words 25
@@ -471,8 +462,7 @@ defmodule Llamex.Analysis.Prose do
     lines = lines |> Enum.map(&%{&1 | text: shape_text(&1.text)}) |> blank_fences()
     paragraphs = paragraphs(lines)
 
-    mid_phrase_breaks(lines) ++
-      Enum.flat_map(paragraphs, &long_sentences/1) ++
+    Enum.flat_map(paragraphs, &long_sentences/1) ++
       Enum.flat_map(paragraphs, &wall_of_text/1) ++
       uniform_paragraphs(paragraphs) ++
       Enum.flat_map(paragraphs, &uniform_sentences/1)
@@ -556,26 +546,6 @@ defmodule Llamex.Analysis.Prose do
 
   defp preview(words) when length(words) > 6, do: Enum.join(Enum.take(words, 6), " ") <> "..."
   defp preview(words), do: Enum.join(words, " ")
-
-  defp mid_phrase_breaks(lines) do
-    dangling = Regex.compile!("\\b(#{Enum.join(@dangling_words, "|")})\\s*$", "i")
-
-    lines
-    |> Enum.chunk_every(2, 1, :discard)
-    |> Enum.flat_map(fn [previous, line] ->
-      continues? =
-        line.line == previous.line + 1 and not break?(previous.text) and
-          not break?(line.text) and not list_item?(line.text)
-
-      case continues? && Regex.run(dangling, previous.text) do
-        [_ending, word] ->
-          [%{line: previous.line, class: "line break in the middle of a phrase", match: word}]
-
-        _no_break ->
-          []
-      end
-    end)
-  end
 
   defp long_sentences(paragraph) do
     for sentence <- paragraph.sentences, sentence.words > @long_sentence_words do

@@ -1193,21 +1193,6 @@ defmodule Llamex.ChecksTest do
       end
     end
 
-    test "flags a line break in the middle of a phrase" do
-      source = """
-      defmodule Sample do
-        # The worker reads the
-        # file from the disk.
-        def helper, do: :ok
-      end
-      """
-
-      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
-      assert issue.message =~ "(line break in the middle of a phrase)"
-      assert issue.line_no == 2
-      assert issue.trigger == "the"
-    end
-
     test "flags a long sentence on the line where the sentence starts" do
       source = """
       defmodule Sample do
