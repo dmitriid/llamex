@@ -459,7 +459,6 @@ URLs count as one word each. The shape findings are:
 
 - a sentence with more than 25 words
 - a paragraph with more than 120 words or more than 6 sentences
-- 3 or more paragraphs in a row with almost the same word count
 - 4 or more sentences in one paragraph with almost the same word count
 
 Each shape finding counts as one match on the line where it starts.

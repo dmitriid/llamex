@@ -311,8 +311,6 @@ defmodule Llamex.Analysis.Prose do
   @long_sentence_words 25
   @wall_words 120
   @wall_sentences 6
-  @uniform_paragraph_min_words 25
-  @uniform_paragraph_spread 1.25
   @uniform_sentence_min_count 4
   @uniform_sentence_min_words 8
   @uniform_sentence_variation 0.2
@@ -464,7 +462,6 @@ defmodule Llamex.Analysis.Prose do
 
     Enum.flat_map(paragraphs, &long_sentences/1) ++
       Enum.flat_map(paragraphs, &wall_of_text/1) ++
-      uniform_paragraphs(paragraphs) ++
       Enum.flat_map(paragraphs, &uniform_sentences/1)
   end
 
@@ -562,40 +559,6 @@ defmodule Llamex.Analysis.Prose do
   end
 
   defp wall_of_text(_paragraph), do: []
-
-  defp uniform_paragraphs(paragraphs, found \\ [])
-
-  defp uniform_paragraphs([], found), do: Enum.reverse(found)
-
-  defp uniform_paragraphs([first | rest] = paragraphs, found) do
-    run = uniform_run(paragraphs, first.words, first.words, [])
-
-    if length(run) >= 3 and Enum.min(run) >= @uniform_paragraph_min_words do
-      finding = %{
-        line: first.line,
-        class: "paragraphs of the same length",
-        match: "#{Enum.join(run, ", ")} words"
-      }
-
-      uniform_paragraphs(Enum.drop(paragraphs, length(run)), [finding | found])
-    else
-      uniform_paragraphs(rest, found)
-    end
-  end
-
-  defp uniform_run([], _low, _high, run), do: Enum.reverse(run)
-
-  defp uniform_run([%{words: words} | rest], low, high, run) do
-    low = min(low, words)
-    high = max(high, words)
-
-    if run != [] and
-         (low < @uniform_paragraph_min_words or high > low * @uniform_paragraph_spread) do
-      Enum.reverse(run)
-    else
-      uniform_run(rest, low, high, [words | run])
-    end
-  end
 
   defp uniform_sentences(%{sentences: sentences} = paragraph)
        when length(sentences) >= @uniform_sentence_min_count do

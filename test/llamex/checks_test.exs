@@ -1228,27 +1228,6 @@ defmodule Llamex.ChecksTest do
       assert uniform_issue.message =~ "(sentences of the same length)"
     end
 
-    test "flags paragraphs of the same length" do
-      paragraph =
-        "The worker reads the file from the disk and checks the digest of every entry in it. " <>
-          "The file is small. The worker logs the result."
-
-      source = """
-      defmodule Sample do
-        @moduledoc \"\"\"
-        #{paragraph}
-
-        #{paragraph}
-
-        #{paragraph}
-        \"\"\"
-      end
-      """
-
-      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
-      assert issue.message =~ "(paragraphs of the same length)"
-    end
-
     test "counts inline code as one word and skips fenced code in shape checks" do
       source = """
       defmodule Sample do
