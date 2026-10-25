@@ -1,75 +1,97 @@
 # Llamex
 
-Llamex is a Credo plugin suite. It detects issues that LLM-assisted Elixir
-refactors commonly introduce. The suite ships nine checks. The plugin
-enables seven of them by default:
+Llamex is a Credo plugin for Elixir projects. It checks code for problems
+that AI coding tools often cause. It reports problems but does not change
+code.
 
-- `Llamex.Check.NoOneLiners`
-- `Llamex.Check.NoAdHocAshQueries`
-- `Llamex.Check.ConsistentInterfaces`
-- `Llamex.Check.NoDBWorkInMemory`
-- `Llamex.Check.NoAuthorizeBypass`
-- `Llamex.Check.NoSelfInLiveViews`
-- `Llamex.Check.NoMultipleAssigns`
+Llamex includes nine checks. Seven checks are active by default:
 
-Two checks are optional. The plugin enables them only with plugin options:
+| Check | What it reports |
+| --- | --- |
+| `NoOneLiners` | Functions that only call another function or put its result in a tuple. |
+| `NoAdHocAshQueries` | Ash queries outside resource actions. |
+| `ConsistentInterfaces` | Ash interface names that differ from their action names. |
+| `NoDBWorkInMemory` | Operations on database records in memory. |
+| `NoAuthorizeBypass` | Calls that use `authorize?: false`. |
+| `NoSelfInLiveViews` | Calls to `self()` in Phoenix LiveViews. |
+| `NoMultipleAssigns` | More than three separate `assign` calls in a pipe chain. |
 
-- `Llamex.Check.NoLLMismsInComments`
-- `Llamex.Check.NoLLMismsInMarkdown`
+Two checks are optional:
 
-The checks detect problems and show useful messages. They do not apply
-automatic fixes.
+| Check | What it reports |
+| --- | --- |
+| `NoLLMismsInComments` | Unclear or unnecessary text in comments and doc strings. |
+| `NoLLMismsInMarkdown` | Unclear or unnecessary text in Markdown files. |
 
-## Project Status
+Each check module uses the prefix `Llamex.Check`.
 
-This project is vibe-coded. An AI coding agent wrote most of the code with
-little user input. We tested the checks on real Elixir projects, but this does
-not guarantee correct results in every project. Review each finding before you
-change code. Your results can vary (YMMV).
+## Project status
 
-For a detailed description of the checks and their initial goals, see the
-[project description](project-description.md).
+An AI coding tool wrote most of this project with little user input.
+Tests on Elixir projects do not prove that all results are correct.
+
+Check each reported problem before you change your code.
+
+The [project description](project-description.md) explains the original
+requirements for the checks.
 
 ## Installation
 
-Llamex is not a published Hex package. Clone the repository next to your
-Elixir project:
+1. Clone Llamex next to your project:
 
-```sh
-git clone https://github.com/dmitriid/llamex.git
-```
+   ```sh
+   git clone https://github.com/dmitriid/llamex.git
+   ```
 
-Then, add Llamex to your project as a local dependency. This example expects
-the Llamex and project directories to have the same parent directory:
+2. Add Llamex to the dependencies in your project:
 
-```elixir
-def deps do
-  [
-    {:llamex, path: "../llamex", only: [:dev, :test], runtime: false}
-  ]
-end
-```
+   ```elixir
+   def deps do
+     [
+       {:llamex, path: "../llamex", only: [:dev, :test], runtime: false}
+     ]
+   end
+   ```
 
-Run `mix deps.get` in your project after you add the dependency.
+3. Run this command in your project directory:
 
-To enable the full suite as a Credo plugin, add `Llamex` to `.credo.exs`:
+   ```sh
+   mix deps.get
+   ```
 
-```elixir
-%{
-  configs: [
-    %{
-      name: "default",
-      plugins: [
-        {Llamex, []}
-      ]
-    }
-  ]
-}
-```
+4. Add `Llamex` to the `plugins` list in `.credo.exs`:
 
-The plugin injects all shipped checks after the project config loads. It
-works with projects that use `checks.enabled`. The plugin skips test files
-and Mix task files by default. To lint those files too:
+   ```elixir
+   %{
+     configs: [
+       %{
+         name: "default",
+         plugins: [
+           {Llamex, []}
+         ]
+       }
+     ]
+   }
+   ```
+
+5. Run Credo:
+
+   ```sh
+   mix credo
+   ```
+
+The plugin adds the seven default checks after Credo reads the project
+configuration. It also supports configurations that use `checks.enabled`.
+
+### Test files and Mix tasks
+
+By default, the checks skip these files:
+
+- Files under `test/`
+- Files with names that end in `_test.exs`
+- Files under `lib/mix/tasks/`
+
+To include these files, set `skip_tests` to `false`:
 
 ```elixir
 plugins: [
@@ -77,44 +99,67 @@ plugins: [
 ]
 ```
 
-To enable the optional `NoLLMismsInComments` check, set the
-`llmisms_in_comments` plugin option. Set it to `true` for the default
-params, or to a keyword list with check params:
+All checks except `NoLLMismsInMarkdown` support `skip_tests`.
+
+### Comments and doc strings
+
+The `llmisms_in_comments` option controls `NoLLMismsInComments`. The value
+`true` enables the check with its default parameters. A keyword list
+enables the check with the specified parameters.
+
+To use the default parameters, add this plugin option:
 
 ```elixir
 plugins: [
   {Llamex, [llmisms_in_comments: true]}
 ]
+```
 
+To change the parameters, use a keyword list:
+
+```elixir
 plugins: [
   {Llamex, [llmisms_in_comments: [max_llmisms: 1, window_lines: 5]]}
 ]
 ```
 
-To enable the optional `NoLLMismsInMarkdown` check, set the
-`llmisms_in_markdown` plugin option. The values are the same as for
-`llmisms_in_comments`. This check needs the `:mdex` package. Llamex
-declares `:mdex` as an optional dependency, so add it to your project:
+### Markdown files
+
+The `llmisms_in_markdown` option controls `NoLLMismsInMarkdown`. It accepts
+`true` or a keyword list, as `llmisms_in_comments` does. This check requires
+`:mdex`, which is an optional dependency of Llamex.
+
+1. Add `:mdex` to the dependencies in your project:
+
+   ```elixir
+   {:mdex, "~> 0.14", only: [:dev, :test], runtime: false}
+   ```
+
+2. Run this command in your project directory:
+
+   ```sh
+   mix deps.get
+   ```
+
+3. Enable the Markdown check in `.credo.exs`:
+
+   ```elixir
+   plugins: [
+     {Llamex, [llmisms_in_comments: true, llmisms_in_markdown: true]}
+   ]
+   ```
+
+To select which Markdown files to check, set `paths`:
 
 ```elixir
-def deps do
-  [
-    {:mdex, "~> 0.14", only: [:dev, :test], runtime: false}
-  ]
-end
-```
-
-```elixir
-plugins: [
-  {Llamex, [llmisms_in_comments: true, llmisms_in_markdown: true]}
-]
-
 plugins: [
   {Llamex, [llmisms_in_markdown: [paths: ["*.md", "docs/**/*.md"]]]}
 ]
 ```
 
-To enable only selected checks, configure those modules directly:
+### Individual checks
+
+To use only selected Elixir checks, add their modules to `checks.extra`:
 
 ```elixir
 %{
@@ -132,23 +177,23 @@ To enable only selected checks, configure those modules directly:
 }
 ```
 
-Every check except `NoLLMismsInMarkdown` supports `skip_tests`, which
-defaults to `true`. When enabled, it skips files under `test/`, `*_test.exs`
-files, and files under `lib/mix/tasks/`.
+The Markdown check also requires the `Llamex` plugin to print source lines
+in Credo output. Its description below explains this requirement.
 
 ## Checks
 
 ### NoOneLiners
 
-Default severity: error-level priority.
+Credo category: `:refactor`. Priority: `:high`.
 
-This check flags redundant wrapper functions. It detects three patterns:
+This check reports functions that add a call without an operation that
+requires a separate function. It detects these cases:
 
-1. The body only delegates to another function.
-2. The body assigns a delegated value and returns it.
-3. The body ignores a helper result and returns a synthetic success tuple.
+- The function only calls another function.
+- The function assigns the result of a call and returns `{:ok, result}`.
+- The function ignores the result of a call and returns a success tuple.
 
-Flagged examples:
+The check reports these functions:
 
 ```elixir
 def search_for_record(id), do: Search.search_for_record(id)
@@ -159,39 +204,40 @@ def get_record(id) do
 end
 ```
 
-The check skips these cases:
+The check skips these functions:
 
-- Guarded or pattern-narrowing heads
-- Rescue/catch/after bodies
-- Boundary callbacks: `handle_event/3`, `handle_call/3`, `handle_info/2`,
-  `handle_params/3`, web-layer `render/*`, and other `handle_*` functions
-- `@impl` functions
+- Functions with more than one clause
+- Functions with guards or patterns that restrict arguments
+- Functions with `rescue`, `catch`, or `after` blocks
+- Callbacks with names that start with `handle_`, such as `handle_event/3`
+- `render` functions in web modules
+- Functions with an `@impl` attribute
 
-For intentional thin boundaries that are not callbacks, add this attribute
-before the function:
+To allow a function that must remain separate, add this attribute before it:
 
 ```elixir
 @llamex_one_liner_allowed true
 ```
 
-Default message:
-
-```text
-Redundant one-line wrapper. Replace with direct call
-```
-
 ### NoAdHocAshQueries
 
-Default severity: warning.
+Credo category: `:warning`. Priority: `:normal`.
 
-This check flags direct `Ash`, `Ash.Query`, and `Ash.Changeset` API calls
-in application modules. It also flags domain interface calls that pass
-inline query options: `load`, `filter`, `sort`, or `query`.
+This check reports direct Ash API calls in application modules. It checks
+calls to these modules:
 
-Pagination options (`page`, `limit`, `offset`) are allowed. Paging at call
-time is the Ash-designed API.
+- `Ash`
+- `Ash.Query`
+- `Ash.Changeset`
 
-Flagged examples:
+It also reports domain interface calls with these query options:
+
+- `load`
+- `filter` or `filters`
+- `sort`
+- `query`
+
+The check reports these calls:
 
 ```elixir
 Ticket
@@ -201,23 +247,24 @@ Ticket
 Support.get_user_records!(id, load: [:comments])
 ```
 
-The check allows aggregate calls like `Ash.count!/1`. It also allows Ash
-implementation modules that `use Ash.Resource.*` or similar extension points.
+The check permits pagination options:
 
-Default message:
+- `page`
+- `limit`
+- `offset`
 
-```text
-Avoid ad-hoc queries. Use domain interfaces instead
-```
+It also permits aggregate calls, such as `Ash.count!/1`. It skips Ash
+implementation modules, such as modules that use `Ash.Resource.*`.
+
+- Put query options in the resource action.
+- Use domain interfaces for application calls.
 
 ### ConsistentInterfaces
 
-Default severity: warning.
+Credo category: `:warning`. Priority: `:normal`.
 
-This check flags Ash domain `define` declarations where the interface name
-differs from the referenced action name.
-
-Flagged example:
+This check reports Ash domain interfaces with names that differ from
+their action names. It reports this declaration:
 
 ```elixir
 define :suggest_card_size_matches,
@@ -225,21 +272,23 @@ define :suggest_card_size_matches,
   args: [:input]
 ```
 
-Default message:
-
-```text
-Keep interface names consistent with action names. Avoid redundant arg passing
-```
+Use the same name for the interface and the action.
 
 ### NoDBWorkInMemory
 
-Default severity: error-level priority for proven local origins.
+Credo category: `:warning`. Priority: `:high`.
 
-This check flags `Enum`, `List`, and `Stream` collection work when the
-collection traces back to an Ash domain interface or direct Ash read. The
-trace stays within the current file. Findings include the traced origin path.
+This check reports operations on collections that appear to come from a
+database. It checks calls to these modules:
 
-Flagged example:
+- `Enum`
+- `List`
+- `Stream`
+
+The check follows values within the current file to find an Ash call or
+a domain interface call. Each reported problem includes the source call.
+
+The check reports this code:
 
 ```elixir
 Books.get_all_books!()
@@ -247,67 +296,58 @@ Books.get_all_books!()
 |> Enum.filter(&(&1.status == :invalid))
 ```
 
-To opt out when whole-dataset in-memory work is intentional, add this
-module attribute:
+Move the operation into the resource action so that the database does the
+work.
+
+To allow operations on the full collection in memory, add this attribute:
 
 ```elixir
 @llamex_db_work_in_memory_allowed true
 ```
 
-Credo inline disable comments also suppress findings.
-
-Default message:
-
-```text
-Do not operate on the whole dataset in memory. Use DB queries via resources
-```
+Credo comments that disable the check also prevent reports.
 
 ### NoAuthorizeBypass
 
-Default severity: warning.
+Credo category: `:warning`. Priority: `:high`.
 
-This check flags `authorize?: false` in Ash action calls, domain interface
-calls, and `Ash.Query`/`Ash.Changeset` calls.
+This check reports `authorize?: false` in Ash calls and domain interface
+calls. It includes calls to `Ash.Query` and `Ash.Changeset`.
 
-Flagged examples:
+The check reports these calls:
 
 ```elixir
 Ash.create!(changeset, authorize?: false)
 Support.get_ticket!(id, authorize?: false)
 ```
 
-Actions must receive the actor that started the call. System-initiated
-actions (Oban jobs, seeds, migrations) must pass a system actor instead:
+Pass the actor that started the action:
 
 ```elixir
-# Do not do this:
-Support.create_ticket!(params, authorize?: false)
-
-# Do this instead:
 Support.create_ticket!(params, actor: user)
+```
 
-# For system-initiated actions:
+For actions that a system process starts, pass a system actor:
+
+```elixir
 Support.create_ticket!(params, actor: %{system: :my_oban_job})
 ```
 
-Default message:
+System processes include these examples:
 
-```text
-Do not use authorize?: false. Pass the actor that started the call, or
-actor: %{system: name} for system-initiated actions
-```
+- Oban jobs
+- Database seed scripts
+- Database migrations
 
 ### NoSelfInLiveViews
 
-Default severity: warning.
+Credo category: `:warning`. Priority: `:high`.
 
-This check reports local `self()` calls inside Phoenix LiveView modules. It
-detects modules that use `Phoenix.LiveView` and modules that use the common
-project macro form, such as `use MyAppWeb, :live_view`.
+This check reports local `self()` calls in Phoenix LiveView modules. It
+recognizes `use Phoenix.LiveView` and project macros such as
+`use MyAppWeb, :live_view`. It checks the module that contains each call.
 
-The check starts at each `self()` call and checks its parent module.
-
-Flagged example:
+The check reports this code:
 
 ```elixir
 def mount(_params, _session, socket) do
@@ -316,23 +356,16 @@ def mount(_params, _session, socket) do
 end
 ```
 
-Default message:
-
-```text
-Do not use self() in Phoenix LiveViews. Use start_async/3 or assign_async/3,
-and handle the result with built-in Phoenix functions. Use Task or supervisor
-trees only in rare cases.
-```
+1. Use `start_async/3` or `assign_async/3` for asynchronous work.
+2. Use the Phoenix functions to process the result.
 
 ### NoMultipleAssigns
 
-Default severity: readability warning. This check does not change the exit
-status of `mix credo`. The build does not fail on its findings.
+Credo category: `:readability`. This check does not change the exit status
+of `mix credo`.
 
-This check reports pipe chains with more than three single-key `assign`
-calls. One `assign` call with a keyword list shows all keys in one place.
-
-Flagged example:
+This check reports pipe chains with more than three `assign` calls that
+each set one key. It reports this code:
 
 ```elixir
 socket
@@ -342,7 +375,7 @@ socket
 |> assign(:url_status, parse_status(params["url_status"]))
 ```
 
-Preferred form:
+Use one `assign` call with a keyword list:
 
 ```elixir
 assign(socket,
@@ -353,49 +386,48 @@ assign(socket,
 )
 ```
 
-The `max_assigns` param sets the threshold. The default value is 3.
-
-Default message:
-
-```text
-For readability, avoid multiple assign statements. Use socket |> assign(key1: ..., key2: ...)
-```
+The `max_assigns` parameter sets the maximum number of separate calls.
+The default value is 3.
 
 ### NoLLMismsInComments
 
-Default severity: readability warning. This check does not change the exit
-status of `mix credo`. The build does not fail on its findings.
+Credo category: `:readability`. This check does not change the exit status
+of `mix credo`. It is optional.
 
-The plugin does not enable this check by default. See the installation
-section for the `llmisms_in_comments` plugin option. You can also add the
-check module to `checks.extra` directly.
+This check searches comments and doc strings for unnecessary phrases and
+unclear text. It checks each block separately. Consecutive `#` comment
+lines form one block.
 
-This check scans each `#` comment block and each doc string for phrases
-that language models write and people do not. A comment block is a run
-of comments on consecutive lines. A doc string is the value of
-`@moduledoc`, `@doc`, `@typedoc`, or `@shortdoc`. Each doc string is one
-block. The check reports a block when the count of matches is above the
-limit for the block size.
+Each doc string in these attributes also forms one block:
 
-The limit is a ratio: `max_llmisms` matches per `window_lines` lines. The
-default is 2 per 10. The ratio applies to blocks of every size:
+- `@moduledoc`
+- `@doc`
+- `@typedoc`
+- `@shortdoc`
 
-- A block of 10 lines can contain 2 matches. The third match is reported.
-- A block of 5 lines can contain 1 match.
-- A block of 1 line can contain 0 matches. One match is reported.
-- In a block longer than `window_lines`, the check scans every window of
-  `window_lines` consecutive lines.
+The limit is `max_llmisms` matches per `window_lines` lines. The default
+limit is 2 matches per 10 lines. The permitted number of matches decreases
+for shorter blocks:
 
-Params:
+| Block length | Permitted matches | First match above the limit |
+| --- | --- | --- |
+| 10 lines | 2 | Third match |
+| 5 lines | 1 | Second match |
+| 1 line | 0 | First match |
 
-| Param          | Default | Meaning                                              |
-| -------------- | ------- | ---------------------------------------------------- |
-| `max_llmisms`  | 2       | The number of matches that `window_lines` lines can contain. |
-| `window_lines` | 10      | The number of lines that `max_llmisms` applies to.   |
-| `skip_tests`   | true    | Skip test files and Mix task files.                  |
+For longer blocks, the check examines each group of `window_lines`
+consecutive lines. It reports one problem per block at most.
 
-To change the params without the plugin option, configure the check module
-directly:
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `max_llmisms` | 2 | The permitted number of matches per group of lines. |
+| `window_lines` | 10 | The number of lines per group. |
+| `skip_tests` | `true` | Skip test files and Mix task files. |
+
+To enable this check, set the `llmisms_in_comments` plugin option as shown
+in the installation instructions.
+
+To set parameters for the individual check, use `checks.extra`:
 
 ```elixir
 checks: %{
@@ -405,172 +437,172 @@ checks: %{
 }
 ```
 
-The check scans for these pattern classes:
+#### Text patterns
 
-- em dashes and semicolons
-- contractions, for example `don't` and `it's`
-- the modals `should`, `would`, `could`, `might`, and `may`
-- present perfect forms, for example `has been` and `have changed`
-- words with no fact, for example `simply`, `robust`, `seamless`,
-  `leverage`, `elegant`
-- Latin abbreviations `e.g.` and `i.e.`, and the phrases `in order to`,
-  `prior to`, `in the event that`
-- filler phrases, for example `under the hood`, `worth noting`,
-  `keep in mind`, `deep dive`
-- metaphor verbs, for example `rescues`, `nudges`, `swallows`, `wires up`
-- the container verb `hold` and the status verb `stand`
-- fact-free adverbs, for example `honestly`, `obviously`, `clearly`
-- process narration, for example `let me`, `I will`, `now we`, `here we`
-- stalling phrases, user validation phrases, and self-blame phrases
-- noun metaphors, for example `guardrail`, `footgun`, `happy path`,
-  `silver bullet`, `a gap in`
-- editorializing adjectives, for example `honest`, `hacky`, `clever`,
-  `clean fix`, `real solution`, `real gap`, `serious issue`
-- narrative, contrast, template, design, and short-answer frames
-- `story`, `ground`, and `leg` as metaphors
-- comma chains with `then`, `but`, `so`, and `-ing` clauses
-- comment narration, for example `this ensures`, `note that`,
-  `make sure to`
-- banned words, for example `fails loudly`, `spearheaded`, `crutch`
-- the container verb `carry`
-- LLM vocabulary, for example `pivotal`, `crucial`, `tapestry`,
-  `streamline`, `empower`
-- chat openers at the start of a line, for example `Sure`, `Certainly`,
-  `Great question`
-- chat closers, for example `hope this helps`, `feel free to`
-- chat assistant voice, for example `as an AI`, `my training data`
-- contrast cliches, for example `not just X but Y` and `X, not Y:`
-- rhetorical questions with an answer, for example `The catch? A race.`
-- list items that start with a bold label or with an emoji
-- dramatic failure verbs, for example `blows up`, `falls over`,
-  `chokes on`
-- parenthetical asides that start with `and`, `but`, or `plus`
-- talk about the change under review, for example `no longer`,
-  `for now`, `this PR`, `quick fix`, and `Previously` at the start of a
-  sentence
-- quoted error messages, for example `"Invalid header"`
-- comments that describe the code at the start of a line, for example
-  `Loop over`, `This function`, `Sets the`
+The check searches for these forms. The examples identify text that the
+check reports.
 
-The check also reads the shape of each block. A paragraph is a run of
-consecutive lines with no blank line. Headings, tables, and fenced code
-end a paragraph. A list item starts a new paragraph. Inline code and
-URLs count as one word each. The shape findings are:
+| Form | Examples |
+| --- | --- |
+| Punctuation | Em dashes and semicolons |
+| Contractions | `don't`, `it's` |
+| Modal verbs | `should`, `would`, `could`, `might`, `may` |
+| Present perfect verbs | `has been`, `have changed` |
+| Words without specific information | `simply`, `robust`, `seamless`, `leverage`, `elegant` |
+| Latin abbreviations | `e.g.`, `i.e.` |
+| Unnecessary phrases | `in order to`, `prior to`, `in the event that` |
+| Unnecessary reminders or introductions | `worth noting`, `keep in mind`, `deep dive` |
+| Verb metaphors | `rescues`, `nudges`, `swallows`, `wires up` |
+| Container or status verbs | `hold`, `carry`, `stand` |
+| Adverbs without specific information | `honestly`, `obviously`, `clearly` |
+| Descriptions of the writer's process | `let me`, `I will`, `now we`, `here we` |
+| Delays, agreement, or blame | `but wait`, `you are right`, `my mistake` |
+| Noun metaphors | `guardrail`, `footgun`, `happy path`, `silver bullet`, `a gap in` |
+| Adjectives that state opinions | `honest`, `hacky`, `clever`, `clean fix`, `serious issue` |
+| Sentence patterns without specific information | `the real need behind`, `the pattern is:`, `short answer` |
+| Template or design metaphors | `is a template for`, `is the design` |
+| Other metaphors | `story`, `ground`, `leg`, `is dead`, `is a lie` |
+| Long clause sequences | Commas with `then`, `but`, `so`, or an `-ing` clause |
+| Unnecessary comment phrases | `this ensures`, `note that`, `make sure to` |
+| Other prohibited words | `fails loudly`, `spearheaded`, `crutch` |
+| Words common in AI text | `pivotal`, `crucial`, `tapestry`, `streamline`, `empower` |
+| Chat introductions | `Sure`, `Certainly`, `Great question` at the start of a line |
+| Chat conclusions | `hope this helps`, `feel free to` |
+| Chat assistant phrases | `as an AI`, `my training data` |
+| Contrast phrases | `not just X but Y`, `X, not Y:` |
+| Questions with immediate answers | `The catch? A race.` |
+| List item prefixes | A bold label or an emoji |
+| Exaggerated failure verbs | `blows up`, `falls over`, `chokes on` |
+| Extra comments in parentheses | Parentheses that start with `and`, `but`, or `plus` |
+| Text about a code change | `no longer`, `for now`, `this PR`, `quick fix`, `Previously` |
+| Quoted error messages | `"Invalid header"` |
+| Comments that repeat the code | `Loop over`, `This function`, `Sets the` at the start of a line |
 
-- a sentence with more than 25 words
-- a paragraph with more than 120 words or more than 6 sentences
-- 4 or more sentences in one paragraph with almost the same word count
+#### Sentence and paragraph limits
 
-Each shape finding counts as one match on the line where it starts.
+The check also reports these problems:
 
-The new pattern classes and the shape findings come from the
-[nollm](https://github.com/NullVoxPopuli/nollm) rule list. The sentence
-and paragraph limits come from ASD-STE100.
+- A sentence contains more than 25 words.
+- A paragraph contains more than 120 words or six sentences.
+- At least four sentences in a paragraph have almost the same word count.
 
-The check ignores inline code in backticks, URLs, and Credo directive
-comments. In doc strings, it also ignores blank lines, fenced code
-blocks, and lines with an indent of 4 spaces or more. The indent rule
-skips doctests and Markdown code blocks. The check does not scan
-`@moduledoc false` or doc attributes with only options, for example
-`@doc since: "1.0"`.
+Each problem counts as one match on its first line. Inline code and URLs
+each count as one word.
 
-Flagged example:
+A paragraph consists of consecutive lines without a blank line. A list
+item starts a new paragraph. These elements end a paragraph:
+
+- Headings
+- Tables
+- Fenced code blocks
+
+Some text patterns and paragraph checks come from the
+[nollm rule list](https://github.com/NullVoxPopuli/nollm).
+
+ASD-STE100 sets these limits for descriptions:
+
+- 25 words per sentence
+- Six sentences per paragraph
+
+#### Text that the check skips
+
+The check skips these elements:
+
+- Inline code in backticks
+- URLs
+- Credo directive comments
+
+In doc strings, it also skips these elements:
+
+- Blank lines
+- Fenced code blocks
+- Lines with an indent of at least four spaces, such as doctests
+
+The check skips `@moduledoc false` and attributes with only options, such
+as `@doc since: "1.0"`.
+
+#### Example
+
+The check reports this comment:
 
 ```elixir
 # This ensures that we don't leak the socket, keep in mind.
 def helper, do: :ok
 ```
 
-Preferred form:
+State the relevant behavior and its effect:
 
 ```elixir
 # The socket closes in terminate/2. A leak here blocks the port.
 def helper, do: :ok
 ```
 
-Default messages:
-
-```text
-Too many LLMisms and non-human text in comments: 3 found in 1 line, limit 2 per 10 lines (contraction, filler phrase, comment narration)
-Too many LLMisms and non-human text in docs: 3 found in 2 lines, limit 2 per 10 lines (word with no fact)
-```
-
-The extended explanation from `mix credo explain` lists the writing rules
-for comments and docs.
+The report includes the match count and the types of text that exceed
+the limit. The explanation from `mix credo explain` includes the rules
+for comments and doc strings.
 
 ### NoLLMismsInMarkdown
 
-Default severity: readability warning. The LLMism findings do not change
-the exit status of `mix credo`. A file that is not UTF-8 text fails the
-build. See below.
+Credo category: `:readability`. Text style problems do not change the exit
+status of `mix credo`. This check is optional.
 
-The plugin does not enable this check by default. See the installation
-section for the `llmisms_in_markdown` plugin option.
+This check uses the same text patterns and limits as `NoLLMismsInComments`.
+Each heading starts a section. Text before the first heading forms a
+separate section. The check reports one problem per section at most.
 
-This check scans the Markdown files of the project with the same patterns,
-shape checks, and limit as `NoLLMismsInComments`. Each heading starts a new
-section. The text before the first heading is one section. The check
-reports a section when the count of matches is above the limit for the
-section size. The check reports one issue per section at most.
+The check uses `:mdex` to parse Markdown files. If `:mdex` is absent, the
+check prints a warning and reports no problems.
 
-The check uses the `:mdex` package to parse the files. It does not scan
-code blocks, HTML blocks, HTML comments, front matter, or blank lines.
-Indented lines inside list items are list text, not code. If `:mdex` is
-not available, the check shows a warning and reports no issues.
+The check skips these elements:
 
-A file that is not UTF-8 text gets an issue in the warning category. That
-issue changes the exit status of `mix credo`, so the build fails. The
-message gives the first line with bytes that are not UTF-8:
+- Code blocks
+- HTML blocks and HTML comments
+- Front matter
+- Blank lines
 
-```text
-Markdown file is not UTF-8 text: line 3 has bytes that are not UTF-8
-```
+The check includes indented text within list items.
 
-Params:
+Files must contain valid UTF-8 text. If a file contains invalid bytes,
+the check reports a warning with the first affected line number. This
+warning changes the exit status of `mix credo` and fails the build.
 
-| Param            | Default                                             | Meaning                                         |
-| ---------------- | --------------------------------------------------- | ----------------------------------------------- |
-| `paths`          | `["**/*.md"]`                                       | The glob patterns of the Markdown files to scan. |
-| `excluded_paths` | `["deps/**", "_build/**", "cover/**", "tmp/**", "**/node_modules/**"]` | The glob patterns of the Markdown files to skip. |
-| `max_llmisms`    | 2                                                   | The number of matches that `window_lines` lines can contain. |
-| `window_lines`   | 10                                                  | The number of lines that `max_llmisms` applies to. |
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `paths` | `["**/*.md"]` | File patterns to include. |
+| `excluded_paths` | `["deps/**", "_build/**", "cover/**", "tmp/**", "**/node_modules/**"]` | File patterns to skip. |
+| `max_llmisms` | 2 | The permitted number of matches per group of lines. |
+| `window_lines` | 10 | The number of lines per group. |
 
-The patterns are relative to the directory where `mix credo` runs. The
-`**` pattern does not match hidden directories, for example `.github/`.
-To scan a hidden directory, add a pattern for it, for example
-`".github/**/*.md"`.
+File patterns are relative to the directory where you run `mix credo`.
+The `**` pattern does not include hidden directories such as `.github/`.
 
-The Markdown files are not Elixir source files. Credo does not run its
-other checks on them. After the analysis, the plugin adds the Markdown
-files with issues to the Credo file list. Credo needs that list to print
-the source line of an issue in `--verbose` mode. Thus, keep `Llamex` in
-the `plugins` list when you configure this check in `checks.extra`.
+To include a hidden directory, add a pattern such as `".github/**/*.md"`
+to `paths`.
 
-Default message:
+Credo runs its Elixir checks on Elixir files. The Llamex plugin adds
+Markdown files with reported problems to the Credo file list after the
+checks finish. Credo uses this list to print source lines in `--verbose`
+output.
 
-```text
-Too many LLMisms and non-human text in markdown: 3 found in 2 lines, limit 2 per 10 lines (word with no fact)
-```
+Keep `Llamex` in the `plugins` list when you add this check to
+`checks.extra`.
 
-## Confidence Model
+## Limits
 
-Llamex classifies findings conservatively:
+The code checks examine the abstract syntax tree of each source file.
+They use code structure and function names to identify possible problems.
+They do not require Ash or Spark metadata at runtime.
 
-- `:proven` — the source is known from local AST or reliable metadata.
-- `:likely` — the issue is strongly indicated through simple inference.
-- `:possible` — there is a plausible path but incomplete information.
+The checks cannot identify every problem in these cases:
 
-The current version implements proven local detection and conservative
-AST-only heuristics. It fails soft when Ash/Spark metadata is unavailable.
+- Calls between files
+- Calls that select a module or function at runtime
+- Generated code
+- Complex macros
 
-## Known Limitations
+The text checks search for listed words and phrases. They also check
+sentence and paragraph length. They do not detect passive voice or
+metaphors outside their lists.
 
-- Cross-file tracing is intentionally shallow.
-- Dynamic dispatch, generated code, and complex macro expansion may be skipped.
-- Ash classification is AST-first. It does not require a full project index.
-- Checks do not rewrite code.
-- `NoLLMismsInComments` and `NoLLMismsInMarkdown` are word list scans with
-  a few shape checks. They do not detect metaphors outside their lists or
-  passive voice.
-- `NoLLMismsInMarkdown` scans the Markdown files on every `mix credo` run,
-  also when the command names one source file.
+`NoLLMismsInMarkdown` checks Markdown files on each `mix credo` run. It
+also checks them when the command specifies one Elixir file.

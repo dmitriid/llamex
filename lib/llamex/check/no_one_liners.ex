@@ -217,7 +217,6 @@ defmodule Llamex.Check.NoOneLiners do
   end
 
   defp static_remote_or_local_call?({_function, _meta, args}) when is_list(args), do: true
-  defp static_remote_or_local_call?(_node), do: false
 
   defp static_receiver?({:__aliases__, _, _parts}), do: true
   defp static_receiver?(receiver) when is_atom(receiver), do: true
