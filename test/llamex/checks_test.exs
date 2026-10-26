@@ -261,7 +261,7 @@ defmodule Llamex.ChecksTest do
       assert Enum.all?(messages(issues), &String.contains?(&1, "Redundant one-line wrapper"))
     end
 
-    test "allows callbacks and wrappers with rescue" do
+    test "allows callbacks and wrappers with `rescue`" do
       source = """
       defmodule Sample do
         def handle_event("search:" <> event, params, socket) do
@@ -1241,6 +1241,61 @@ defmodule Llamex.ChecksTest do
       """
 
       assert [] = issues(Llamex.Check.NoLLMismsInComments, source)
+    end
+
+    test "flags describe, test, and property names in test files with skip_tests off" do
+      source = ~S'''
+      defmodule SampleTest do
+        use ExUnit.Case
+
+        describe "the cache seamlessly loads" do
+          test "returns nil when the file doesn't exist", %{dir: dir} do
+            assert nil == Cache.load(dir)
+          end
+
+          test "reads the file"
+
+          property "the #{name} key should never be empty" do
+            :ok
+          end
+        end
+      end
+      '''
+
+      assert [describe, test, property] =
+               test_file_issues(Llamex.Check.NoLLMismsInComments, source, skip_tests: false)
+
+      assert describe.message ==
+               "Too many LLMisms and non-human text in test names: 1 found in 1 line, limit 2 per 10 lines (word with no fact)"
+
+      assert describe.line_no == 4
+      assert describe.trigger == "seamlessly"
+      assert test.line_no == 5
+      assert test.trigger == "doesn't"
+      assert property.line_no == 11
+      assert property.trigger == "should"
+    end
+
+    test "skips test names with skip_tests on" do
+      source = """
+      defmodule SampleTest do
+        use ExUnit.Case
+
+        test "simply works", do: :ok
+      end
+      """
+
+      assert [] = test_file_issues(Llamex.Check.NoLLMismsInComments, source)
+    end
+
+    test "skips test calls outside test files" do
+      source = """
+      defmodule Sample do
+        def run, do: test "simply works"
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoLLMismsInComments, source, skip_tests: false)
     end
   end
 end

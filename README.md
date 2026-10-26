@@ -20,7 +20,7 @@ Two checks are optional:
 
 | Check | What it reports |
 | --- | --- |
-| `NoLLMismsInComments` | Unclear or unnecessary text in comments and doc strings. |
+| `NoLLMismsInComments` | Unclear or unnecessary text in comments, doc strings, and test names. |
 | `NoLLMismsInMarkdown` | Unclear or unnecessary text in Markdown files. |
 
 Each check module uses the prefix `Llamex.Check`.
@@ -394,9 +394,9 @@ The default value is 3.
 Credo category: `:readability`. This check does not change the exit status
 of `mix credo`. It is optional.
 
-This check searches comments and doc strings for unnecessary phrases and
-unclear text. It checks each block separately. Consecutive `#` comment
-lines form one block.
+This check searches comments, doc strings, and test names for unnecessary
+phrases and unclear text. It checks each block separately. Consecutive `#`
+comment lines form one block.
 
 Each doc string in these attributes also forms one block:
 
@@ -404,6 +404,23 @@ Each doc string in these attributes also forms one block:
 - `@doc`
 - `@typedoc`
 - `@shortdoc`
+
+If `skip_tests` is `false`, the check also searches the test names in
+test files. A test name is the text after `describe`, `test`, or
+`property`. Each test name forms one block:
+
+```elixir
+describe "the cache" do
+  test "returns nil for a missing file" do
+```
+
+The check ignores text in backticks.
+
+To use code in a test name, put the code in backticks:
+
+```elixir
+test "returns nil after `rescue`" do
+```
 
 The limit is `max_llmisms` matches per `window_lines` lines. The default
 limit is 2 matches per 10 lines. The permitted number of matches decreases
