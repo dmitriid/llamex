@@ -43,6 +43,13 @@ defmodule Llamex.Analysis.LLMisms do
     - For sequences of actions, prefer lists over multiple short sentences
       in a row.
     - Do not use run-on sentences.
+    - Do not join sentences with "thus". Delete the word and write
+      the result as a separate sentence. If the order of the
+      sentences does not show the link, put the cause in a time or
+      condition clause before the result: "After the controller does
+      the stop steps, the import call fails." Do not start the result
+      sentence with "Because", "So", "Therefore", "Hence", or "As a
+      result". These words are legal in other positions.
     - Do not write more than 25 words in a sentence or more than 6
       sentences in a paragraph.
     - Break a line where there is a pause. Do not end a line on "the",

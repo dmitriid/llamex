@@ -404,6 +404,9 @@ defmodule Llamex.Analysis.Prose do
       {"trailing contrast after long clause", ~r/(?:^|[.!?]\s+|\n)[^.\n!?]{45,},\s+(?:but)\b/i},
       {"design frame", ~r/\b(?:is|are|was|were)\s+the\s+(?:design)\b/i},
       {"but-so causal chain", ~r/\b(?:But)\b[^.!?\n]{1,120},\s+(?:so)\b/i},
+      # A capital "Thus" at the start of a line is a sentence start. A
+      # lowercase "thus" at the start of a line is a wrapped line.
+      {"'thus' connective", ~r/(?:^\s*(?-i:Thus)|[.!?:,]\s*thus)\b/i},
       {"comma plus -ing clause",
        ~r/,\s+(?!everything\b|anything\b|nothing\b|something\b|string\b|thing\b)\w+ing\b/i},
       {"comment narration",
@@ -454,6 +457,9 @@ defmodule Llamex.Analysis.Prose do
   paragraph is a run of consecutive lines with no blank line. Headings,
   tables, and fenced code end a paragraph. A list item starts a new
   paragraph. Inline code and URLs count as one word each.
+
+  The check for repeated "thus" reads the full block. It reports a
+  block with the word "thus" 2 or more times, in any paragraph.
   """
   @spec shape([line()]) :: [shape_finding()]
   def shape(lines) do
@@ -462,7 +468,8 @@ defmodule Llamex.Analysis.Prose do
 
     Enum.flat_map(paragraphs, &long_sentences/1) ++
       Enum.flat_map(paragraphs, &wall_of_text/1) ++
-      Enum.flat_map(paragraphs, &uniform_sentences/1)
+      Enum.flat_map(paragraphs, &uniform_sentences/1) ++
+      repeated_thus(lines)
   end
 
   defp shape_text(text) do
@@ -522,7 +529,9 @@ defmodule Llamex.Analysis.Prose do
         {[{byte_size(text), line.line} | pieces], text <> line.text}
       end)
 
-    ends = Regex.scan(~r/[.!?]+(?:["')\]]+)?(?:\s+|$)/, text, return: :index)
+    # A period directly before "Thus" ends a sentence. Without this
+    # rule, the glued form "slow.Thus" joins two sentences into one.
+    ends = Regex.scan(~r/[.!?]+(?:["')\]]+)?(?:\s+|$|(?=[Tt]hus\b))/, text, return: :index)
     starts = [0 | Enum.map(ends, fn [{start, length}] -> start + length end)]
     stops = Enum.map(ends, fn [{start, _length}] -> start end) ++ [byte_size(text)]
 
@@ -580,4 +589,18 @@ defmodule Llamex.Analysis.Prose do
   end
 
   defp uniform_sentences(_paragraph), do: []
+
+  # The finding points to the line of the second "thus".
+  defp repeated_thus(lines) do
+    thus =
+      for line <- lines, _match <- Regex.scan(~r/\bthus\b/i, line.text), do: line.line
+
+    case thus do
+      [_first, second | _rest] ->
+        [%{line: second, class: "repeated 'thus'", match: "#{length(thus)} in one block"}]
+
+      _fewer ->
+        []
+    end
+  end
 end

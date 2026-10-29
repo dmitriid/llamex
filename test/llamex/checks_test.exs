@@ -1209,6 +1209,44 @@ defmodule Llamex.ChecksTest do
       assert issue.trigger == "The worker reads each file once..."
     end
 
+    test "flags each 'thus' connective and the repeated 'thus' in a doc string" do
+      source = """
+      defmodule Sample do
+        @moduledoc \"""
+        A broker task calls `begin_mutation/1` before a change of data. After the
+        deadline, the controller refuses the request. Thus, a mutation starts
+        before the deadline and completes, or it does not start.
+
+        ## Recursion
+
+        For `app.recurse`, the broker task returns `{:recurse, params}`. The
+        controller does not answer the import call. It sets the result
+        `{:recurse, params}` and does the stop steps of the deadline.Thus, the
+        import call fails, the WebAssembly call stops, and the app code after
+        `app.recurse` does not run. `invoke/3` then returns
+        `{:recurse, params, stats}`.
+        \"""
+      end
+      """
+
+      assert [issue] = issues(Llamex.Check.NoLLMismsInComments, source)
+      assert issue.message =~ "3 found in 10 lines"
+      assert issue.message =~ "('thus' connective, repeated 'thus')"
+      assert issue.line_no == 4
+    end
+
+    test "skips a lowercase 'thus' at the start of a wrapped line" do
+      source = """
+      defmodule Sample do
+        # The parser is fast and
+        # thus cheap.
+        def helper, do: :ok
+      end
+      """
+
+      assert [] = issues(Llamex.Check.NoLLMismsInComments, source)
+    end
+
     test "flags a wall of text and sentences of the same length in a doc string" do
       wall = String.duplicate("The worker reads the file. ", 7)
       uniform = String.duplicate("The worker reads the file from the disk again. ", 4)
